@@ -1,4 +1,4 @@
-"""Hybrid Column Mapping Auto-Suggester.
+﻿"""Hybrid Column Mapping Auto-Suggester.
 
 Task: S2-AI-02
 Implements a two-tier hybrid recommendation engine:
@@ -40,9 +40,9 @@ if _project_root not in sys.path:
 
 from rapidfuzz import fuzz
 
-from backend.app.llm.base import BaseProvider
-from backend.app.llm.factory import get_llm_provider
-from backend.app.llm.types import Message, ProviderResponse
+from app.llm.base import BaseProvider
+from app.llm.factory import get_llm_provider
+from app.llm.types import Message, ProviderResponse
 
 # ---------------------------------------------------------------------------
 # Data Models
@@ -162,7 +162,7 @@ CANONICAL_SIGNALS: Dict[str, CanonicalSignalMeta] = {
     "irradiance_poa": CanonicalSignalMeta(
         key="irradiance_poa",
         display_name="Plane of Array Irradiance",
-        unit="W/m²",
+        unit="W/mÂ²",
         description="Solar irradiance incident upon the tilted PV collector plane.",
         synonyms=[
             "irradiation", "irradiance", "poa", "g poa", "solar radiation",
@@ -175,7 +175,7 @@ CANONICAL_SIGNALS: Dict[str, CanonicalSignalMeta] = {
     "irradiance_ghi": CanonicalSignalMeta(
         key="irradiance_ghi",
         display_name="Global Horizontal Irradiance",
-        unit="W/m²",
+        unit="W/mÂ²",
         description="Solar irradiance received on a horizontal surface at ground level.",
         synonyms=[
             "ghi", "g ghi", "global horizontal irradiance", "horizontal irradiance",
@@ -186,7 +186,7 @@ CANONICAL_SIGNALS: Dict[str, CanonicalSignalMeta] = {
     "temperature_ambient": CanonicalSignalMeta(
         key="temperature_ambient",
         display_name="Ambient Air Temperature",
-        unit="°C",
+        unit="Â°C",
         description="Outdoor ambient dry-bulb air temperature at the weather station.",
         synonyms=[
             "ambient temperature", "amb temp", "airtc avg", "t amb", "air temp",
@@ -198,7 +198,7 @@ CANONICAL_SIGNALS: Dict[str, CanonicalSignalMeta] = {
     "temperature_module": CanonicalSignalMeta(
         key="temperature_module",
         display_name="PV Module Temperature",
-        unit="°C",
+        unit="Â°C",
         description="Surface temperature of the solar photovoltaic panel or cells.",
         synonyms=[
             "module temperature", "mod temp", "moduletc avg", "t mod",
@@ -679,7 +679,7 @@ class MappingSuggester:
 
         # Build concise catalog of canonical signals
         catalog_lines = [
-            f"- {k}: {m.display_name} ({m.unit}) — {m.description}"
+            f"- {k}: {m.display_name} ({m.unit}) â€” {m.description}"
             for k, m in CANONICAL_SIGNALS.items()
         ]
         catalog_str = "\n".join(catalog_lines)
@@ -777,3 +777,4 @@ async def suggest_mappings_async(
     """Asynchronous convenience functional wrapper to suggest column mappings."""
     suggester = MappingSuggester(provider=provider, default_threshold=threshold)
     return await suggester.suggest_batch_async(headers, sample_data=sample_data, threshold=threshold)
+

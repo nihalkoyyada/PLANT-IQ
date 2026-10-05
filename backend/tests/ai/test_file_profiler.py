@@ -19,7 +19,7 @@ from typing import Any, List
 import polars as pl
 import pytest
 
-from backend.app.ai.file_profiler import (
+from app.ai.file_profiler import (
     ColumnStatistic,
     EmptyFileError,
     FileProfileResult,

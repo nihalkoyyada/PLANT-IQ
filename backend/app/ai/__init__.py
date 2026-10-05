@@ -1,6 +1,6 @@
-"""PlantIQ AI Subpackage: File Profiling, Column Mapping, and Ingestion Intelligence."""
+﻿"""PlantIQ AI Subpackage: File Profiling, Column Mapping, and Ingestion Intelligence."""
 
-from backend.app.ai.file_profiler import (
+from app.ai.file_profiler import (
     ColumnStatistic,
     EmptyFileError,
     FileProfileResult,
@@ -11,7 +11,7 @@ from backend.app.ai.file_profiler import (
     UnsupportedFileFormatError,
     profile_file,
 )
-from backend.app.ai.ingest_worker import (
+from app.ai.ingest_worker import (
     ChannelMappingConfig,
     IngestConfig,
     IngestResult,
@@ -19,7 +19,7 @@ from backend.app.ai.ingest_worker import (
     QCFlag,
     evaluate_qc_series,
 )
-from backend.app.ai.job_history import (
+from app.ai.job_history import (
     JobHistory,
     JobRunContext,
     build_qc_summary,
@@ -35,7 +35,7 @@ from backend.app.ai.job_history import (
     record_job_qc_summary_async,
     track_pipeline_job,
 )
-from backend.app.ai.mapping_suggester import (
+from app.ai.mapping_suggester import (
     CANONICAL_SIGNALS,
     BatchMappingResult,
     MappingSuggester,
@@ -81,4 +81,5 @@ __all__ = [
     "list_job_records_async",
     "track_pipeline_job",
 ]
+
 

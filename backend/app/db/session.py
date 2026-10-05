@@ -7,9 +7,15 @@ from typing import Generator, Optional
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.app.models.base import Base
+from pathlib import Path
+from dotenv import load_dotenv
 
-DEFAULT_DB_URL = "sqlite:///plantiq.db"
+from app.db.base import Base
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(BASE_DIR / ".env")
+
+DEFAULT_DB_URL = "postgresql+psycopg://plantiq:plantiq_dev_password@localhost:5432/plantiq"
 
 
 def get_db_url(db_url: Optional[str] = None) -> str:
@@ -39,3 +45,4 @@ def get_session_factory(engine: Engine) -> sessionmaker[Session]:
 def init_db(engine: Engine) -> None:
     """Initialize database tables from SQLAlchemy metadata."""
     Base.metadata.create_all(bind=engine)
+

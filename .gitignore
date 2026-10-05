@@ -1,9 +1,49 @@
-.venv/
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
 .pytest_cache/
 .mypy_cache/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+dist/
+build/
+.vite/
+
+# VS Code / IDE
+.vscode/
+.idea/
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Local databases
 *.db
+*.sqlite
 *.sqlite3
+
+# PlantIQ local uploaded/generated files
+backend/uploads/
+uploads/
+backend_backup_sprint1/
+scratch/

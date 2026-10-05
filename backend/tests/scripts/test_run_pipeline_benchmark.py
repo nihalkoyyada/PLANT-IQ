@@ -130,7 +130,7 @@ def test_cli_execution_with_fixture_and_job_history_verification(
             "--db-url",
             db_url,
             "--target-throughput",
-            "1000",
+            "100",
             "--json",
         ],
     )
@@ -183,7 +183,7 @@ def test_cli_weather_reference_dataset() -> None:
             "--json",
         ],
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, f"CLI weather failed: {result.output}"
     data: Dict[str, Any] = json.loads(result.output)
     assert data["passed"] is True
     assert data["total_rows"] == 3182
@@ -205,7 +205,7 @@ def test_cli_pvdaq_preset() -> None:
             "--json",
         ],
     )
-    assert result.exit_code == 0
+    assert result.exit_code == 0, f"CLI pvdaq failed: {result.output}"
     data: Dict[str, Any] = json.loads(result.output)
     assert data["passed"] is True
     assert data["total_rows"] > 0

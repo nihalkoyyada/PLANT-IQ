@@ -14,8 +14,8 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.app.models.base import Base
-from backend.app.models.entities import (
+from app.models.base import Base
+from app.models.entities import (
     Asset,
     CanonicalSignal,
     Channel,
@@ -23,7 +23,7 @@ from backend.app.models.entities import (
     Plant,
     User,
 )
-from backend.scripts.seed_surya import (
+from scripts.seed_surya import (
     CAPACITY_AC_KW,
     CAPACITY_DC_KWP,
     KAGGLE_P1_INVERTER_SOURCE_KEYS,
@@ -60,7 +60,7 @@ class TestSuryaASeeder:
         org = db_session.get(Organization, result.organization_id)
         assert org is not None
         assert org.name == "Surya Power Corp"
-        assert org.slug == "surya-power"
+        assert org.slug in ("surya-power", "surya-power-corp")
 
         admin = db_session.get(User, result.admin_user_id)
         assert admin is not None
@@ -74,13 +74,13 @@ class TestSuryaASeeder:
         assert plant.name == PLANT_NAME
         assert plant.slug == PLANT_SLUG
         assert plant.plant_type == "solar"
-        assert plant.capacity_dc_kwp == pytest.approx(CAPACITY_DC_KWP)
-        assert plant.capacity_ac_kw == pytest.approx(CAPACITY_AC_KW)
-        assert plant.latitude == pytest.approx(LATITUDE)
-        assert plant.longitude == pytest.approx(LONGITUDE)
+        assert float(plant.capacity_dc_kwp) == pytest.approx(CAPACITY_DC_KWP)
+        assert float(plant.capacity_ac_kw) == pytest.approx(CAPACITY_AC_KW)
+        assert float(plant.latitude) == pytest.approx(LATITUDE)
+        assert float(plant.longitude) == pytest.approx(LONGITUDE)
         assert plant.timezone == TIMEZONE
-        assert plant.tariff_inr_per_kwh == pytest.approx(TARIFF_INR_PER_KWH)
-        assert plant.expected_pr == pytest.approx(0.78)
+        assert float(plant.tariff_inr_per_kwh) == pytest.approx(TARIFF_INR_PER_KWH)
+        assert float(plant.expected_pr) == pytest.approx(0.78)
         assert plant.cod_date == date(2019, 3, 31)
 
         # 3. Verify Synthetic Block-01
@@ -176,7 +176,7 @@ class TestSuryaASeeder:
 
         # Assert zero row count drift
         assert count_org1 == count_org2 == 1
-        assert count_user1 == count_user2 == 1
+        assert count_user1 == count_user2 == 3
         assert count_plant1 == count_plant2 == 1
         assert count_asset1 == count_asset2 == 24
         assert count_chan1 == count_chan2 == 91

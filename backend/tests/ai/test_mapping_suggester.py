@@ -18,7 +18,7 @@ import json
 from typing import Any, AsyncIterator, Dict, List, Optional
 import pytest
 
-from backend.app.ai.mapping_suggester import (
+from app.ai.mapping_suggester import (
     CANONICAL_SIGNALS,
     BatchMappingResult,
     MappingSuggester,
@@ -27,8 +27,8 @@ from backend.app.ai.mapping_suggester import (
     suggest_mappings,
     suggest_mappings_async,
 )
-from backend.app.llm.base import BaseProvider
-from backend.app.llm.types import (
+from app.llm.base import BaseProvider
+from app.llm.types import (
     Message,
     ProviderResponse,
     StreamDelta,

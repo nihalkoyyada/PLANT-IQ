@@ -24,7 +24,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.app.ai.ingest_worker import (
+from app.ai.ingest_worker import (
     ChannelMappingConfig,
     IngestConfig,
     IngestResult,
@@ -32,7 +32,7 @@ from backend.app.ai.ingest_worker import (
     QCFlag,
     evaluate_qc_series,
 )
-from backend.app.models import Base, Channel, Observation
+from app.models import Base, Channel, Reading
 
 
 # ---------------------------------------------------------------------------
@@ -391,11 +391,11 @@ def test_bulk_upsert_and_idempotency(worker: IngestWorker, in_memory_engine: Eng
     assert res1.total_rows_processed == 2
     assert res1.observations_created == 2
 
-    # Query DB to check observations
+    # Query DB to check readings
     with Session(in_memory_engine) as session:
-        observations = session.scalars(select(Observation)).all()
-        assert len(observations) == 2
-        obs_map = {obs.timestamp.isoformat(): obs.value for obs in observations}
+        readings = session.scalars(select(Reading)).all()
+        assert len(readings) == 2
+        obs_map = {obs.ts.isoformat(): obs.value for obs in readings}
 
     # Re-ingest with modified values (simulating a backfill / correction)
     df_updated = pl.DataFrame({
@@ -415,7 +415,7 @@ def test_bulk_upsert_and_idempotency(worker: IngestWorker, in_memory_engine: Eng
 
     # Verify no duplicate rows; values were updated cleanly
     with Session(in_memory_engine) as session:
-        all_obs = session.scalars(select(Observation)).all()
+        all_obs = session.scalars(select(Reading)).all()
         assert len(all_obs) == 2
         updated_values = sorted([obs.value for obs in all_obs])
         assert updated_values == [1500.0, 1800.0]

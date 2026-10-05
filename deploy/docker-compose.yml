@@ -1,0 +1,15 @@
+services: 
+ postgres:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: plantiq
+      POSTGRES_USER: plantiq
+      POSTGRES_PASSWORD: plantiq_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+ redis:
+    image: redis:7-alpine
+volumes:
+  postgres_data:

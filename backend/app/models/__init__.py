@@ -1,14 +1,18 @@
-"""Export all SQLAlchemy models."""
+﻿"""Export all SQLAlchemy models."""
 
-from backend.app.models.base import Base, TimestampMixin, generate_uuid
-from backend.app.models.entities import (
+from app.models.base import Base, TimestampMixin, generate_uuid
+
+from app.models.entities import (
     Asset,
     CanonicalSignal,
     Channel,
+    File,
+    IngestionJob,
     JobHistory,
-    Observation,
+    MappingTemplate,
     Organization,
     Plant,
+    Reading,
     User,
 )
 
@@ -22,6 +26,9 @@ __all__ = [
     "Asset",
     "CanonicalSignal",
     "Channel",
-    "Observation",
+    "File",
+    "MappingTemplate",
+    "IngestionJob",
+    "Reading",
     "JobHistory",
 ]

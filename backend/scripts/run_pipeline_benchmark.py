@@ -387,7 +387,7 @@ async def execute_pipeline_benchmark(
     6. Job History Update: Commit final QC summary and throughput into background job table.
     """
     start_total_time = time.perf_counter()
-    active_run_id = run_id or generate_uuid()
+    active_run_id = str(run_id) if run_id else str(generate_uuid())
 
     # 1. Resolve Target File & Presets
     dataset_key = str(dataset_target).lower()
@@ -874,7 +874,7 @@ def main(
 
     if json_output:
         out = results_list[0] if len(results_list) == 1 else results_list
-        print(json.dumps(out, indent=2))
+        print(json.dumps(out, indent=2, default=str))
 
     if not overall_passed:
         raise typer.Exit(code=1)

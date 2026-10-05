@@ -32,10 +32,10 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from backend.app.core.units import convert
-from backend.app.db.session import create_db_engine, get_session_factory, init_db
-from backend.app.models.base import generate_uuid
-from backend.app.models.entities import Channel, Observation
+from app.core.units import convert
+from app.db.session import create_db_engine, get_session_factory, init_db
+from app.models.base import generate_uuid
+from app.models.entities import Channel, Reading
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ class IngestConfig:
     cadence_seconds: int = 900  # Default: 15-minute standard solar interval (900s)
     gap_tolerance_factor: float = 1.5  # Gap flagged if delta > cadence * 1.5 (e.g. > 1350s)
     flatline_min_steps: int = 4  # Flag if >= 4 identical consecutive non-zero intervals (1 hour)
-    flatline_min_value_threshold: float = 1.0  # Ignore zeros (nighttime 0W / 0 W/m² is normal)
+    flatline_min_value_threshold: float = 1.0  # Ignore zeros (nighttime 0W / 0 W/mÂ² is normal)
     batch_size: int = 5000  # Database chunk size for batch upsert
     device_ratings_dc: Dict[str, float] = field(default_factory=dict)  # device_id -> rated_dc_w
     device_ratings_ac: Dict[str, float] = field(default_factory=dict)  # device_id -> rated_ac_w
@@ -137,10 +137,10 @@ DEFAULT_CANONICAL_BOUNDS: Dict[str, Tuple[float, float, float]] = {
     "power_ac": (0.0, 1500000.0, 1300000.0),      # Up to 1.5 MW per central inverter
     "energy_ac_daily": (0.0, 30000000.0, 2000000.0),  # Up to 30 MWh daily
     "energy_ac_total": (0.0, 1e12, 5000000.0),
-    "irradiance_poa": (0.0, 1500.0, 1200.0),      # Max 1500 W/m² (POA with cloud-enhancement)
+    "irradiance_poa": (0.0, 1500.0, 1200.0),      # Max 1500 W/mÂ² (POA with cloud-enhancement)
     "irradiance_ghi": (0.0, 1361.0, 1100.0),      # Max solar constant
-    "temperature_ambient": (-30.0, 60.0, 15.0),   # -30°C to 60°C; max 15°C jump in 15 mins
-    "temperature_module": (-20.0, 90.0, 25.0),    # -20°C to 90°C; max 25°C jump in 15 mins
+    "temperature_ambient": (-30.0, 60.0, 15.0),   # -30Â°C to 60Â°C; max 15Â°C jump in 15 mins
+    "temperature_module": (-20.0, 90.0, 25.0),    # -20Â°C to 90Â°C; max 25Â°C jump in 15 mins
     "voltage_dc": (0.0, 1500.0, 500.0),
     "current_dc": (0.0, 3000.0, 1000.0),
     "voltage_ac": (0.0, 1000.0, 200.0),
@@ -276,9 +276,18 @@ class IngestWorker:
         aggregation_method: str = "avg",
     ) -> str:
         """Lookup cached channel_id or persist a new Channel row."""
-        cache_key = (asset_id, canonical_key)
+        cache_key = (str(asset_id), canonical_key)
         if cache_key in self._channel_cache:
             return self._channel_cache[cache_key]
+
+        import uuid as _uuid_mod
+        if isinstance(asset_id, _uuid_mod.UUID):
+            asset_uuid = asset_id
+        else:
+            try:
+                asset_uuid = _uuid_mod.UUID(str(asset_id))
+            except ValueError:
+                asset_uuid = _uuid_mod.uuid5(_uuid_mod.NAMESPACE_DNS, str(asset_id))
 
         with self._channel_lock:
             if cache_key in self._channel_cache:
@@ -289,30 +298,32 @@ class IngestWorker:
                 existing = (
                     session.query(Channel)
                     .filter(
-                        Channel.asset_id == asset_id,
-                        Channel.canonical_signal_key == canonical_key,
+                        Channel.asset_id == asset_uuid,
+                        Channel.canonical_key == canonical_key,
                     )
                     .first()
                 )
                 if existing:
-                    self._channel_cache[cache_key] = existing.id
-                    return existing.id
+                    str_id = str(existing.id)
+                    self._channel_cache[cache_key] = str_id
+                    return str_id
 
                 # Create new channel
                 new_id = generate_uuid()
                 new_channel = Channel(
                     id=new_id,
-                    asset_id=asset_id,
-                    canonical_signal_key=canonical_key,
+                    asset_id=asset_uuid,
+                    canonical_key=canonical_key,
                     source_name=source_name,
-                    source_unit=source_unit,
+                    receive_unit=source_unit,
                     interval_s=interval_s,
-                    aggregation_method=aggregation_method,
+                    agg_semantics=aggregation_method,
                 )
                 session.add(new_channel)
                 session.commit()
-                self._channel_cache[cache_key] = new_id
-                return new_id
+                str_id = str(new_id)
+                self._channel_cache[cache_key] = str_id
+                return str_id
 
     # -----------------------------------------------------------------------
     # Ingestion Core Pipeline
@@ -452,8 +463,8 @@ class IngestWorker:
             "power_dc": "W",
             "energy_ac_daily": "Wh",
             "energy_ac_total": "Wh",
-            "irradiance_poa": "W/m²",
-            "irradiance_ghi": "W/m²",
+            "irradiance_poa": "W/mÂ²",
+            "irradiance_ghi": "W/mÂ²",
             "temperature_ambient": "degC",
             "temperature_module": "degC",
             "voltage_dc": "V",
@@ -486,34 +497,30 @@ class IngestWorker:
         now_str = datetime.now(timezone.utc).isoformat()
 
         # Format narrow DataFrame with all columns ready for cursor.executemany
-        ids = [generate_uuid() for _ in range(total_rows)]
         formatted_df = observations_df.with_columns([
-            pl.Series("id", ids, dtype=pl.String),
-            observations_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S+00:00").alias("timestamp"),
-            pl.lit(now_str).alias("created_at"),
-            pl.lit(now_str).alias("updated_at"),
-        ]).select(["id", "channel_id", "timestamp", "value", "raw_value", "qc_flag", "created_at", "updated_at"])
+            observations_df["timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S+00:00").alias("ts"),
+            observations_df["qc_flag"].cast(pl.Int32).alias("quality"),
+            pl.lit(None, dtype=pl.String).alias("ingestion_job_id"),
+        ]).select(["channel_id", "ts", "value", "quality", "ingestion_job_id"])
 
         # Prepare SQL statement based on dialect (PostgreSQL vs SQLite)
         if dialect_name == "postgresql":
             raw_sql = """
-                INSERT INTO observations (id, channel_id, timestamp, value, raw_value, qc_flag, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (channel_id, timestamp) DO UPDATE SET
+                INSERT INTO readings (channel_id, ts, value, quality, ingestion_job_id)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (channel_id, ts) DO UPDATE SET
                     value = EXCLUDED.value,
-                    raw_value = EXCLUDED.raw_value,
-                    qc_flag = EXCLUDED.qc_flag,
-                    updated_at = EXCLUDED.updated_at
+                    quality = EXCLUDED.quality,
+                    ingestion_job_id = EXCLUDED.ingestion_job_id
             """
         else:
             raw_sql = """
-                INSERT INTO observations (id, channel_id, timestamp, value, raw_value, qc_flag, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (channel_id, timestamp) DO UPDATE SET
+                INSERT INTO readings (channel_id, ts, value, quality, ingestion_job_id)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (channel_id, ts) DO UPDATE SET
                     value = excluded.value,
-                    raw_value = excluded.raw_value,
-                    qc_flag = excluded.qc_flag,
-                    updated_at = excluded.updated_at
+                    quality = excluded.quality,
+                    ingestion_job_id = excluded.ingestion_job_id
             """
 
         written_count = 0
@@ -537,13 +544,12 @@ class IngestWorker:
                         written_count += len(chunk_slice)
                 else:
                     sa_sql = text("""
-                        INSERT INTO observations (id, channel_id, timestamp, value, raw_value, qc_flag, created_at, updated_at)
-                        VALUES (:id, :channel_id, :timestamp, :value, :raw_value, :qc_flag, :created_at, :updated_at)
-                        ON CONFLICT (channel_id, timestamp) DO UPDATE SET
+                        INSERT INTO readings (channel_id, ts, value, quality, ingestion_job_id)
+                        VALUES (:channel_id, :ts, :value, :quality, :ingestion_job_id)
+                        ON CONFLICT (channel_id, ts) DO UPDATE SET
                             value = excluded.value,
-                            raw_value = excluded.raw_value,
-                            qc_flag = excluded.qc_flag,
-                            updated_at = excluded.updated_at
+                            quality = excluded.quality,
+                            ingestion_job_id = excluded.ingestion_job_id
                     """)
                     for offset in range(0, total_rows, chunk_size):
                         chunk_slice = formatted_df.slice(offset, chunk_size)
@@ -678,3 +684,4 @@ class IngestWorker:
             device_col=device_col,
             default_asset_id=default_asset_id,
         )
+

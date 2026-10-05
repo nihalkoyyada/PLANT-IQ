@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
-from sqlalchemy import DateTime, String
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import DateTime, func
+from sqlalchemy.orm import Mapped, mapped_column
 
-
-class Base(DeclarativeBase):
-    """Base declarative class for all PlantIQ database models."""
-    pass
+from app.db.base import Base
 
 
 class TimestampMixin:
@@ -18,17 +15,18 @@ class TimestampMixin:
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False,
     )
 
 
-def generate_uuid() -> str:
-    """Generate a UUID4 hex string."""
-    return str(uuid.uuid4())
+def generate_uuid() -> uuid.UUID:
+    """Generate a UUID4 object."""
+    return uuid.uuid4()
+

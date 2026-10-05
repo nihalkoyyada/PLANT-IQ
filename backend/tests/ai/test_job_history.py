@@ -26,8 +26,8 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from backend.app.ai.ingest_worker import IngestResult
-from backend.app.ai.job_history import (
+from app.ai.ingest_worker import IngestResult
+from app.ai.job_history import (
     JobHistory,
     build_qc_summary,
     create_job_record,
@@ -42,7 +42,7 @@ from backend.app.ai.job_history import (
     record_job_qc_summary_async,
     track_pipeline_job,
 )
-from backend.app.models.base import Base
+from app.models.base import Base
 
 
 @pytest.fixture

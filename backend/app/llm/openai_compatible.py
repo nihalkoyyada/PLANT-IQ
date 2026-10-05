@@ -1,4 +1,4 @@
-"""OpenAI-compatible Provider implementation for local vLLM and air-gapped endpoints."""
+﻿"""OpenAI-compatible Provider implementation for local vLLM and air-gapped endpoints."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ import time
 from typing import Any, AsyncIterator, Dict, List, Optional
 import httpx
 
-from backend.app.llm.base import BaseProvider
-from backend.app.llm.exceptions import ProviderError
-from backend.app.llm.hooks import UsageRecorder
-from backend.app.llm.types import (
+from app.llm.base import BaseProvider
+from app.llm.exceptions import ProviderError
+from app.llm.hooks import UsageRecorder
+from app.llm.types import (
     Message,
     ProviderResponse,
     StopReason,
@@ -330,3 +330,4 @@ class OpenAICompatibleProvider(BaseProvider):
         finally:
             if client_ctx != self._client:
                 await client_ctx.aclose()
+

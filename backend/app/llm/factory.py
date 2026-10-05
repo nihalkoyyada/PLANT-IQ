@@ -1,4 +1,4 @@
-"""Provider factory with strict environment-based configuration (NFR-5)."""
+﻿"""Provider factory with strict environment-based configuration (NFR-5)."""
 
 from __future__ import annotations
 
@@ -6,14 +6,14 @@ import os
 from typing import List, Optional
 import httpx
 
-from backend.app.llm.anthropic import (
+from app.llm.anthropic import (
     AnthropicProvider,
     DEFAULT_ANTHROPIC_MODEL,
 )
-from backend.app.llm.base import BaseProvider
-from backend.app.llm.exceptions import ProviderAuthenticationError, ProviderError
-from backend.app.llm.hooks import UsageRecorder
-from backend.app.llm.openai_compatible import (
+from app.llm.base import BaseProvider
+from app.llm.exceptions import ProviderAuthenticationError, ProviderError
+from app.llm.hooks import UsageRecorder
+from app.llm.openai_compatible import (
     DEFAULT_OPENAI_COMPATIBLE_URL,
     DEFAULT_OPENAI_MODEL,
     OpenAICompatibleProvider,
@@ -90,3 +90,4 @@ def get_llm_provider(
         f"Unsupported LLM_PROVIDER '{resolved_provider}'. Expected 'anthropic' or 'openai_compatible'.",
         provider=resolved_provider,
     )
+

@@ -12,7 +12,7 @@ Validates:
 import math
 import pytest
 import polars as pl
-from backend.app.core.units import (
+from app.core.units import (
     UnknownConversionError,
     convert,
     get_converter,

@@ -1,4 +1,4 @@
-"""Backend Background Job History Hooks and QC Summary Recording.
+﻿"""Backend Background Job History Hooks and QC Summary Recording.
 
 Task: S2-AI-04
 Provides database persistence and lifecycle tracking for pipeline benchmark runs,
@@ -21,10 +21,10 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from backend.app.ai.ingest_worker import IngestResult
-from backend.app.db.session import create_db_engine, get_session_factory, init_db
-from backend.app.models.base import generate_uuid
-from backend.app.models.entities import JobHistory
+from app.ai.ingest_worker import IngestResult
+from app.db.session import create_db_engine, get_session_factory, init_db
+from app.models.base import generate_uuid
+from app.models.entities import JobHistory
 
 
 # ---------------------------------------------------------------------------
@@ -399,3 +399,4 @@ async def track_pipeline_job(
             metadata_json={"exception_type": exc.__class__.__name__},
         )
         raise
+

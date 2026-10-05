@@ -1,4 +1,4 @@
-"""Base Provider Protocol and abstract implementation with retry resilience."""
+﻿"""Base Provider Protocol and abstract implementation with retry resilience."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import time
 from typing import Any, AsyncIterator, Callable, Coroutine, Dict, List, Optional, TypeVar
 import httpx
 
-from backend.app.llm.exceptions import (
+from app.llm.exceptions import (
     ProviderAuthenticationError,
     ProviderError,
     ProviderRateLimited,
@@ -18,8 +18,8 @@ from backend.app.llm.exceptions import (
     ProviderServiceUnavailable,
     ProviderTimeout,
 )
-from backend.app.llm.hooks import UsageRecorder
-from backend.app.llm.types import Message, ProviderResponse, StreamDelta, ToolDefinition, Usage
+from app.llm.hooks import UsageRecorder
+from app.llm.types import Message, ProviderResponse, StreamDelta, ToolDefinition, Usage
 
 T = TypeVar("T")
 
@@ -198,3 +198,4 @@ class BaseProvider(ABC):
             f"Execution failed after {self.max_retries} retries: {last_error}",
             provider=provider_name,
         )
+

@@ -21,8 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 import typer
 
-from backend.app.db.session import create_db_engine, get_session_factory, init_db
-from backend.app.models.entities import (
+from app.db.session import create_db_engine, get_session_factory, init_db
+from app.models.entities import (
     Asset,
     CanonicalSignal,
     Channel,
@@ -212,7 +212,7 @@ def seed_canonical_signals_if_missing(session: Session) -> None:
 
     for sig in signals_to_ensure:
         existing = session.execute(
-            select(CanonicalSignal).where(CanonicalSignal.signal_key == sig.signal_key)
+            select(CanonicalSignal).where(CanonicalSignal.key == sig.signal_key)
         ).scalar_one_or_none()
         if existing is None:
             session.add(sig)
@@ -253,9 +253,9 @@ def seed_surya_data(
         or DEFAULT_ADMIN_PASSWORD
     )
 
-    # 1. Organization Seeding (Idempotent by slug)
+    # 1. Organization Seeding (Idempotent by name)
     org = session.execute(
-        select(Organization).where(Organization.slug == DEFAULT_ORG_SLUG)
+        select(Organization).where(Organization.name == DEFAULT_ORG_NAME)
     ).scalar_one_or_none()
 
     if org is None:
@@ -266,29 +266,42 @@ def seed_surya_data(
         session.add(org)
         session.flush()
 
-    # 2. Admin User Seeding (Idempotent by email)
-    admin_user = session.execute(
-        select(User).where(User.email == resolved_email)
-    ).scalar_one_or_none()
+    # 2. User Seeding (Admin, Engineer, Viewer - Idempotent by email)
+    users_to_seed = [
+        ("admin@surya.plantiq.ai", "SuryaAdmin#2026", "Surya Admin", "admin"),
+        ("engineer@surya.plantiq.ai", "SuryaEngineer#2026", "Surya Engineer", "engineer"),
+        ("viewer@surya.plantiq.ai", "SuryaViewer#2026", "Surya Viewer", "viewer"),
+    ]
 
-    if admin_user is None:
-        admin_user = User(
-            organization_id=org.id,
-            email=resolved_email,
-            hashed_password=hash_password(resolved_password),
-            full_name=DEFAULT_ADMIN_FULL_NAME,
-            is_active=True,
-            is_superuser=True,
-        )
-        session.add(admin_user)
-        session.flush()
-    elif reset:
-        admin_user.hashed_password = hash_password(resolved_password)
-        session.flush()
+    admin_user = None
+    for email, pw, name, role in users_to_seed:
+        u = session.execute(
+            select(User).where(User.email == email)
+        ).scalar_one_or_none()
+
+        if u is None:
+            u = User(
+                org_id=org.id,
+                email=email,
+                password_hash=hash_password(pw),
+                full_name=name,
+                role=role,
+                is_active=True,
+            )
+            session.add(u)
+        else:
+            u.org_id = org.id
+            u.role = role
+            u.full_name = name
+            if reset:
+                u.password_hash = hash_password(pw)
+        if role == "admin":
+            admin_user = u
+    session.flush()
 
     # 3. Handle --reset flag: Teardown existing Surya-A Plant
     existing_plant = session.execute(
-        select(Plant).where(Plant.organization_id == org.id, Plant.slug == PLANT_SLUG)
+        select(Plant).where(Plant.org_id == org.id, Plant.name == PLANT_NAME)
     ).scalar_one_or_none()
 
     if existing_plant is not None and reset:
@@ -300,7 +313,7 @@ def seed_surya_data(
     # 4. Plant Seeding (Surya-A)
     if existing_plant is None:
         plant = Plant(
-            organization_id=org.id,
+            org_id=org.id,
             name=PLANT_NAME,
             slug=PLANT_SLUG,
             plant_type=PLANT_TYPE,
@@ -312,7 +325,7 @@ def seed_surya_data(
             tariff_inr_per_kwh=TARIFF_INR_PER_KWH,
             expected_pr=EXPECTED_PR,
             cod_date=COD_DATE,
-            metadata_json={
+            metadata_={
                 "kaggle_plant_id": 4135001,
                 "site": "Bhadla Solar Park, Rajasthan",
                 "country": "India",
@@ -439,7 +452,7 @@ def seed_surya_data(
             existing_ch = session.execute(
                 select(Channel).where(
                     Channel.asset_id == inv_asset.id,
-                    Channel.canonical_signal_key == ch_def["canonical_signal_key"],
+                    Channel.canonical_key == ch_def["canonical_signal_key"],
                 )
             ).scalar_one_or_none()
 
@@ -487,7 +500,7 @@ def seed_surya_data(
         existing_ch = session.execute(
             select(Channel).where(
                 Channel.asset_id == ws_asset.id,
-                Channel.canonical_signal_key == ch_def["canonical_signal_key"],
+                Channel.canonical_key == ch_def["canonical_signal_key"],
             )
         ).scalar_one_or_none()
 
@@ -555,21 +568,21 @@ def main(
     session_factory = get_session_factory(engine)
     with session_factory() as session:
         if reset:
-            typer.secho("⚠ Reset flag detected: Rebuilding Surya-A tree...", fg=typer.colors.YELLOW)
+            typer.secho("[!] Reset flag detected: Rebuilding Surya-A tree...", fg=typer.colors.YELLOW)
         else:
             typer.echo("Running in idempotent mode (safe re-run)...")
 
         result = seed_surya_data(session=session, reset=reset)
 
-    typer.secho("\n✔ Successfully seeded Surya-A Asset Tree!", fg=typer.colors.GREEN, bold=True)
-    typer.echo(f"  • Organization ID:      {result.organization_id}")
-    typer.echo(f"  • Admin User ID:        {result.admin_user_id}")
-    typer.echo(f"  • Plant ID (Surya-A):   {result.plant_id}")
-    typer.echo(f"  • Synthetic Block ID:   {result.block_id}")
-    typer.echo(f"  • Inverters Seeded:     {result.inverter_count} (INV-01..INV-22)")
-    typer.echo(f"  • Weather Station ID:   {result.weather_station_id} (WS-01)")
-    typer.echo(f"  • Total Assets:         {result.total_assets} (1 Block + 22 Inverters + 1 WS)")
-    typer.echo(f"  • Total Channels:       {result.total_channels} (22*4 + 1*3 = 91 channels)")
+    typer.secho("\n[OK] Successfully seeded Surya-A Asset Tree!", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"  - Organization ID:      {result.organization_id}")
+    typer.echo(f"  - Admin User ID:        {result.admin_user_id}")
+    typer.echo(f"  - Plant ID (Surya-A):   {result.plant_id}")
+    typer.echo(f"  - Synthetic Block ID:   {result.block_id}")
+    typer.echo(f"  - Inverters Seeded:     {result.inverter_count} (INV-01..INV-22)")
+    typer.echo(f"  - Weather Station ID:   {result.weather_station_id} (WS-01)")
+    typer.echo(f"  - Total Assets:         {result.total_assets} (1 Block + 22 Inverters + 1 WS)")
+    typer.echo(f"  - Total Channels:       {result.total_channels} (22*4 + 1*3 = 91 channels)")
     typer.echo("==================================================")
 
 

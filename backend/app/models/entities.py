@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID, uuid4
 from typing import Any, Dict, List, Optional
+import json
 from sqlalchemy import (
     ARRAY,
     BigInteger,
@@ -19,6 +20,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    TypeDecorator,
     UniqueConstraint,
     Uuid,
     func,
@@ -30,6 +32,38 @@ from sqlalchemy.dialects.postgresql import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
+
+
+class FlagsArray(TypeDecorator[List[str]]):
+    """Platform-independent array of string flags (Postgres ARRAY(Text), SQLite JSON/Text)."""
+
+    impl = ARRAY(Text)
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect: Any) -> Any:
+        if dialect.name == "sqlite":
+            return dialect.type_descriptor(Text())
+        return dialect.type_descriptor(ARRAY(Text()))
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            value = []
+        if dialect.name == "sqlite":
+            if isinstance(value, (list, tuple, set)):
+                return json.dumps(list(value))
+            return str(value)
+        return list(value)
+
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return []
+        if dialect.name == "sqlite" and isinstance(value, str):
+            try:
+                return json.loads(value)
+            except (ValueError, TypeError):
+                return []
+        return list(value)
+
 
 
 class Organization(Base):
@@ -250,6 +284,7 @@ class Plant(Base):
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="plants")
     assets: Mapped[List["Asset"]] = relationship("Asset", back_populates="plant", cascade="all, delete-orphan")
+    kpi_values: Mapped[List["KPIValue"]] = relationship("KPIValue", back_populates="plant", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs: Any) -> None:
         if "organization_id" in kwargs:
@@ -353,6 +388,7 @@ class Asset(Base):
     parent: Mapped[Optional["Asset"]] = relationship("Asset", remote_side=[id], back_populates="children")
     children: Mapped[List["Asset"]] = relationship("Asset", back_populates="parent", cascade="all, delete-orphan")
     channels: Mapped[List["Channel"]] = relationship("Channel", back_populates="asset", cascade="all, delete-orphan")
+    kpi_values: Mapped[List["KPIValue"]] = relationship("KPIValue", back_populates="asset", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs: Any) -> None:
         if "metadata_json" in kwargs:
@@ -798,3 +834,55 @@ class JobHistory(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class KPIValue(Base):
+    """Calculated KPI value record per plant and asset (TimescaleDB hypertable)."""
+
+    __tablename__ = "kpi_values"
+    __table_args__ = (
+        CheckConstraint("period IN ('day', 'month')", name="ck_kpi_values_period"),
+    )
+
+    time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        primary_key=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    asset_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=True,
+    )
+    kpi_key: Mapped[str] = mapped_column(
+        Text,
+        primary_key=True,
+    )
+    period: Mapped[str] = mapped_column(
+        Text,
+        primary_key=True,
+    )
+    value: Mapped[Optional[float]] = mapped_column(
+        DOUBLE_PRECISION,
+        nullable=True,
+    )
+    coverage: Mapped[float] = mapped_column(
+        Numeric,
+        nullable=False,
+        server_default="1.0",
+        default=1.0,
+    )
+    flags: Mapped[List[str]] = mapped_column(
+        FlagsArray,
+        nullable=False,
+        server_default="{}",
+        default=list,
+    )
+
+    plant: Mapped["Plant"] = relationship("Plant", back_populates="kpi_values")
+    asset: Mapped[Optional["Asset"]] = relationship("Asset", back_populates="kpi_values")

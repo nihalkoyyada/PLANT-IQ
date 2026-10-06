@@ -1,4 +1,4 @@
-﻿"""Export all SQLAlchemy models."""
+"""Export all SQLAlchemy models."""
 
 from app.models.base import Base, TimestampMixin, generate_uuid
 
@@ -9,6 +9,7 @@ from app.models.entities import (
     File,
     IngestionJob,
     JobHistory,
+    KPIValue,
     MappingTemplate,
     Organization,
     Plant,
@@ -31,4 +32,5 @@ __all__ = [
     "IngestionJob",
     "Reading",
     "JobHistory",
+    "KPIValue",
 ]

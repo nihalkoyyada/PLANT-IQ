@@ -26,6 +26,24 @@ class ChannelCreate(ChannelBase):
     asset_id: UUID
 
 
+class ChannelUpdate(BaseModel):
+    canonical_key: str | None = None
+    source_name: str | None = None
+    receive_unit: str | None = None
+    conversion: str | None = None
+    interval_s: int | None = Field(default=None, gt=0)
+    agg_semantics: (
+        Literal[
+            "avg",
+            "sum",
+            "min",
+            "max",
+            "last",
+        ]
+        | None
+    ) = None
+
+
 class ChannelResponse(ChannelBase):
     id: UUID
     asset_id: UUID

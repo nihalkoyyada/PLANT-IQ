@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { Header } from './components/layout/Header';
 import { Sidebar, NavTab } from './components/layout/Sidebar';
 import { MobileNav } from './components/layout/MobileNav';
@@ -16,6 +17,11 @@ import { Activity, Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  // Unauthenticated users land directly on the Registration page first
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [prefilledEmail, setPrefilledEmail] = useState<string>('');
+
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const saved = localStorage.getItem('plantiq_active_tab');
     return (saved as NavTab) || 'dashboard';
@@ -56,7 +62,27 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    if (authMode === 'register') {
+      return (
+        <RegisterPage
+          onNavigateLogin={() => {
+            setSuccessMessage(null);
+            setAuthMode('login');
+          }}
+        />
+      );
+    }
+
+    return (
+      <LoginPage
+        onNavigateRegister={() => {
+          setSuccessMessage(null);
+          setAuthMode('register');
+        }}
+        successMessage={successMessage}
+        initialEmail={prefilledEmail}
+      />
+    );
   }
 
   const handleSelectTab = (tab: NavTab) => {

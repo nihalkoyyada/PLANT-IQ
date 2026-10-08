@@ -11,6 +11,9 @@ import jwt
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "plantiq-secret-key-change-in-production-2026")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+ALLOW_SELF_REGISTRATION_ROLE_SELECTION = os.getenv("ALLOW_SELF_REGISTRATION_ROLE_SELECTION", "true").lower() in ("true", "1", "yes")
+
 
 
 def hash_pbkdf2(password: str) -> str:
@@ -61,6 +64,24 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode.update({
         "exp": int(expire.timestamp()),
         "iat": int(now.timestamp()),
+        "type": "access",
+    })
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
+
+
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a signed JWT refresh token."""
+    to_encode = data.copy()
+    now = datetime.now(timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+    to_encode.update({
+        "exp": int(expire.timestamp()),
+        "iat": int(now.timestamp()),
+        "type": "refresh",
     })
     return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
 

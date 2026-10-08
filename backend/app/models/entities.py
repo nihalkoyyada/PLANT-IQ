@@ -1032,8 +1032,126 @@ class Detector(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "method IN ('zscore', 'iqr', 'deviation', 'isolation_forest')",
+            "method IN ('zscore', 'iqr', 'deviation', 'isolation_forest', 'd1_statistical', 'd2_pr_deviation', 'trip', 'flatline', 'clipping', 'soiling', 'd3_irradiance_residual', 'd4_isolation_forest')",
             name="ck_detectors_method",
+        ),
+    )
+
+
+class Anomaly(Base):
+    """Detected Anomaly entity recording algorithmic and ML telemetry outliers."""
+
+    __tablename__ = "anomalies"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    asset_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("assets.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    channel_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("channels.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    detector_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("detectors.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    end_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    source: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="detector",
+        server_default="detector",
+    )
+    score: Mapped[float] = mapped_column(
+        Float().with_variant(DOUBLE_PRECISION, "postgresql"),
+        nullable=False,
+        default=1.0,
+    )
+    severity: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="medium",
+        server_default="medium",
+    )
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="open",
+        server_default="open",
+    )
+    estimated_loss_kw: Mapped[Optional[float]] = mapped_column(
+        Numeric,
+        nullable=True,
+    )
+    summary: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    details: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    rca_narrative: Mapped[Optional[dict]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+    )
+    rca_by: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    status_note: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    plant: Mapped["Plant"] = relationship("Plant")
+    asset: Mapped[Optional["Asset"]] = relationship("Asset")
+    channel: Mapped[Optional["Channel"]] = relationship("Channel")
+    detector: Mapped[Optional["Detector"]] = relationship("Detector")
+    rca_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[rca_by])
+
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('low', 'medium', 'high', 'critical')",
+            name="ck_anomalies_severity",
+        ),
+        CheckConstraint(
+            "status IN ('open', 'acknowledged', 'resolved', 'false_positive')",
+            name="ck_anomalies_status",
         ),
     )
 

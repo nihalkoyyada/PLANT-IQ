@@ -75,6 +75,34 @@ from app.ai.kpi_engine import (
     integrate_irradiation_kwh_m2,
     is_daylight,
 )
+from app.ai.detector_registry import (
+    BaseDetector,
+    D1StatisticalDetector,
+    D2PRDeviationDetector,
+    D3IrradianceResidualDetector,
+    D4IsolationForestDetector,
+    DetectedAnomaly,
+    DetectorContext,
+    DetectorRegistry,
+    DeviationDetector,
+    IQRDetector,
+    IsolationForestDetector,
+    ZScoreDetector,
+    calculate_clear_sky_expected_power,
+    calculate_clear_sky_irradiance,
+    calculate_solar_position,
+    register_detector,
+)
+from app.ai.anomaly_policy import (
+    FinancialAssessment,
+    FinancialLossPolicy,
+    SeverityPolicy,
+)
+from app.ai.anomaly_dedup import (
+    find_matching_open_anomaly,
+    merge_or_create_anomaly,
+    persist_and_deduplicate_anomalies,
+)
 
 __all__ = [
     "FileProfiler",
@@ -142,6 +170,43 @@ __all__ = [
     "integrate_irradiation_kwh_m2",
     "compute_inverter_solar_kpis",
     "compute_plant_solar_kpis",
+    "DetectorRegistry",
+    "register_detector",
+    "BaseDetector",
+    "D1StatisticalDetector",
+    "D2PRDeviationDetector",
+    "D3IrradianceResidualDetector",
+    "D4IsolationForestDetector",
+    "IsolationForestDetector",
+    "ZScoreDetector",
+    "IQRDetector",
+    "DeviationDetector",
+    "calculate_solar_position",
+    "calculate_clear_sky_irradiance",
+    "calculate_clear_sky_expected_power",
+    "DetectorContext",
+    "DetectedAnomaly",
+    "SeverityPolicy",
+    "FinancialLossPolicy",
+    "FinancialAssessment",
+    "find_matching_open_anomaly",
+    "merge_or_create_anomaly",
+    "persist_and_deduplicate_anomalies",
+    "GroundTruthEvent",
+    "ClassificationMetrics",
+    "LeadTimeMetrics",
+    "DetectorBenchmarkResult",
+    "CAREBenchmarkSuite",
+    "CAREBenchmarkEngine",
 ]
+from app.ai.care_benchmark import (
+    CAREBenchmarkEngine,
+    CAREBenchmarkSuite,
+    ClassificationMetrics,
+    DetectorBenchmarkResult,
+    GroundTruthEvent,
+    LeadTimeMetrics,
+)
+
 
 

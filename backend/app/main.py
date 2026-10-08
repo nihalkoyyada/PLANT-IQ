@@ -15,6 +15,7 @@ from app.api.events import router as events_router
 from app.api.kpis import router as kpis_router
 from app.api.canonical_signals import router as canonical_signals_router
 from app.api.detectors import router as detectors_router
+from app.api.anomalies import router as anomalies_router
 from app.api.dev import router as dev_router
 from app.db.session import create_db_engine, get_session_factory
 from app.models import Asset
@@ -52,6 +53,7 @@ app.include_router(assets_router)
 app.include_router(channels_router)
 app.include_router(canonical_signals_router)
 app.include_router(detectors_router)
+app.include_router(anomalies_router)
 app.include_router(readings_router)
 app.include_router(files_router)
 app.include_router(mapping_templates_router)

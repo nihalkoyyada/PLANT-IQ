@@ -200,3 +200,187 @@ def test_organization_isolation_across_users(client):
         assert "Access denied" in response.json()["detail"]
     finally:
         db_session.close()
+
+
+# ----------------------------------------------------
+# REGISTRATION & REFRESH TOKEN & AUDIT LOG TESTS
+# ----------------------------------------------------
+
+def test_register_admin_role(client):
+    unique_email = f"reg_admin_{uuid4().hex[:6]}@example.com"
+    pw = "AdminPass#2026"
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": unique_email,
+            "password": pw,
+            "full_name": "Registered Admin User",
+            "organization_name": "Admin Test Org",
+            "role": "admin",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["user"]["email"] == unique_email
+    assert data["user"]["role"] == "admin"
+    assert "password" not in data["user"]
+    assert "password_hash" not in data["user"]
+
+    # Verify DB state
+    db = SessionLocal()
+    try:
+        user_db = db.query(User).filter(User.email == unique_email).first()
+        assert user_db is not None
+        assert user_db.role == "admin"
+    finally:
+        db.close()
+
+    # Login with registered Admin
+    login_res = client.post("/auth/login", json={"email": unique_email, "password": pw})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    assert login_res.json()["user"]["role"] == "admin"
+
+    # Verify /auth/me returns admin role
+    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["role"] == "admin"
+
+
+def test_register_engineer_role(client):
+    unique_email = f"reg_eng_{uuid4().hex[:6]}@example.com"
+    pw = "EngineerPass#2026"
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": unique_email,
+            "password": pw,
+            "full_name": "Registered Engineer User",
+            "organization_name": "Engineer Test Org",
+            "role": "engineer",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["user"]["role"] == "engineer"
+
+    # Login with registered Engineer
+    login_res = client.post("/auth/login", json={"email": unique_email, "password": pw})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    assert login_res.json()["user"]["role"] == "engineer"
+
+    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["role"] == "engineer"
+
+
+def test_register_viewer_role(client):
+    unique_email = f"reg_viewer_{uuid4().hex[:6]}@example.com"
+    pw = "ViewerPass#2026"
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": unique_email,
+            "password": pw,
+            "full_name": "Registered Viewer User",
+            "organization_name": "Viewer Test Org",
+            "role": "viewer",
+        },
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["user"]["role"] == "viewer"
+
+    # Login with registered Viewer
+    login_res = client.post("/auth/login", json={"email": unique_email, "password": pw})
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+    assert login_res.json()["user"]["role"] == "viewer"
+
+    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["role"] == "viewer"
+
+
+def test_register_invalid_role(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": f"badrole_{uuid4().hex[:6]}@example.com",
+            "password": "Password#2026",
+            "full_name": "Invalid Role User",
+            "role": "superadmin",
+        },
+    )
+    assert response.status_code == 422
+    assert "Role must be one of" in response.json()["detail"]
+
+
+def test_register_duplicate_email(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": "admin@surya.plantiq.ai",
+            "password": "SuryaAdmin#2026",
+            "full_name": "Duplicate Admin",
+        },
+    )
+    assert response.status_code == 409
+    assert "already exists" in response.json()["detail"]
+
+
+def test_register_short_password(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": f"short_{uuid4().hex[:6]}@example.com",
+            "password": "123",
+            "full_name": "Short Password User",
+        },
+    )
+    assert response.status_code == 422
+
+
+
+def test_refresh_token_success(client):
+    # First login to get refresh token
+    login_res = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "SuryaAdmin#2026"})
+    assert login_res.status_code == 200
+    refresh_tok = login_res.json()["refresh_token"]
+
+    # Call refresh endpoint
+    ref_res = client.post("/auth/refresh", json={"refresh_token": refresh_tok})
+    assert ref_res.status_code == 200
+    data = ref_res.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["user"]["email"] == "admin@surya.plantiq.ai"
+
+
+def test_refresh_token_using_access_token_fails(client):
+    # Get access token
+    login_res = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "SuryaAdmin#2026"})
+    access_tok = login_res.json()["access_token"]
+
+    # Try passing access token as refresh token -> must fail 401
+    ref_res = client.post("/auth/refresh", json={"refresh_token": access_tok})
+    assert ref_res.status_code == 401
+    assert "access tokens cannot be used as refresh tokens" in ref_res.json()["detail"].lower()
+
+
+def test_audit_log_safety(client):
+    db_session = SessionLocal()
+    try:
+        from app.models import AuditLog
+        audit_entries = db_session.query(AuditLog).all()
+        assert len(audit_entries) > 0
+
+        # Verify no entry leaks passwords or raw tokens in details JSON
+        for entry in audit_entries:
+            details_str = str(entry.details).lower()
+            assert "password" not in details_str
+            assert "access_token" not in details_str
+            assert "refresh_token" not in details_str
+    finally:
+        db_session.close()

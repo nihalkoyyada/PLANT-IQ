@@ -1,6 +1,8 @@
-services: 
- postgres:
+services:
+  postgres:
     image: timescale/timescaledb:latest-pg16
+    container_name: plantiq-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: plantiq
       POSTGRES_USER: plantiq
@@ -9,7 +11,80 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
- redis:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plantiq -d plantiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
     image: redis:7-alpine
+    container_name: plantiq-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: plantiq-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+psycopg://plantiq:plantiq_dev_password@postgres:5432/plantiq
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_SECRET=dev_secret_key_change_in_production
+      - ENVIRONMENT=development
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: plantiq-worker
+    restart: unless-stopped
+    command: celery -A app.core.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+psycopg://plantiq:plantiq_dev_password@postgres:5432/plantiq
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - JWT_SECRET=dev_secret_key_change_in_production
+      - ENVIRONMENT=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: plantiq-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:

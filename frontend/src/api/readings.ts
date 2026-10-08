@@ -9,7 +9,7 @@ export interface GetReadingAggregateParams {
   channel_id: string;
   start?: string;
   end?: string;
-  interval?: '5min' | 'hour' | 'day' | 'week';
+  interval?: '5min' | '15min' | 'hour' | 'day' | 'week';
 }
 
 export interface GetReadingSummaryParams {

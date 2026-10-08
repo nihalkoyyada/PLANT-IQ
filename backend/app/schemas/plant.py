@@ -30,6 +30,27 @@ class PlantCreate(PlantBase):
     org_id: UUID
 
 
+class PlantUpdate(BaseModel):
+    name: str | None = None
+    plant_type: Literal["solar", "wind", "process"] | None = None
+
+    capacity_ac_kw: float | None = None
+    capacity_dc_kwp: float | None = None
+
+    latitude: float | None = None
+    longitude: float | None = None
+
+    timezone: str | None = None
+
+    cod_date: date | None = None
+
+    expected_pr: float | None = None
+
+    tariff_inr_per_kwh: float | None = None
+
+    metadata: dict | None = None
+
+
 class PlantResponse(PlantBase):
     id: UUID
     org_id: UUID

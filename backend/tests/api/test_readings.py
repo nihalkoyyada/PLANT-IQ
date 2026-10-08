@@ -304,3 +304,271 @@ def test_latest_power_reading_suite(client):
         db_session.close()
 
 
+def test_readings_aggregate_15min_numerical_accuracy(client):
+    """Verify 15-minute aggregation bucket boundaries, count, min/max, and numerical accuracy."""
+    db_session = SessionLocal()
+    try:
+        org = Organization(name=f"Org 15min Accuracy {uuid4()}")
+        db_session.add(org)
+        db_session.flush()
+
+        user = User(
+            org_id=org.id,
+            email=f"user_{uuid4()}@example.com",
+            password_hash="hashed",
+            full_name="15min Accuracy Tester",
+            role="engineer",
+        )
+        db_session.add(user)
+        db_session.flush()
+
+        plant = Plant(name="Plant 15min Accuracy", org_id=org.id, plant_type="solar")
+        db_session.add(plant)
+        db_session.flush()
+
+        asset = Asset(name="Inverter 15min", plant_id=plant.id, asset_type="inverter")
+        db_session.add(asset)
+        db_session.flush()
+
+        channel = Channel(
+            asset_id=asset.id,
+            canonical_key="power_ac",
+            source_name="AC_POWER",
+            receive_unit="kW",
+            interval_s=300,
+        )
+        db_session.add(channel)
+        db_session.flush()
+
+        # Bucket 1: 10:00, 10:05, 10:10 (values 100, 120, 140 -> avg 120)
+        t1 = datetime(2020, 5, 15, 10, 0, tzinfo=timezone.utc)
+        t2 = datetime(2020, 5, 15, 10, 5, tzinfo=timezone.utc)
+        t3 = datetime(2020, 5, 15, 10, 10, tzinfo=timezone.utc)
+
+        # Bucket 2: 10:15 (value 200)
+        t4 = datetime(2020, 5, 15, 10, 15, tzinfo=timezone.utc)
+
+        r1 = Reading(channel_id=channel.id, ts=t1, value=100.0)
+        r2 = Reading(channel_id=channel.id, ts=t2, value=120.0)
+        r3 = Reading(channel_id=channel.id, ts=t3, value=140.0)
+        r4 = Reading(channel_id=channel.id, ts=t4, value=200.0)
+
+        db_session.add_all([r1, r2, r3, r4])
+        db_session.commit()
+
+        token = create_access_token({"sub": str(user.id), "org_id": str(org.id), "role": "engineer"})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        response = client.get(
+            f"/readings/aggregate?channel_id={channel.id}&start=2020-05-15T10:00:00Z&end=2020-05-15T10:30:00Z&interval=15min",
+            headers=headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 2
+
+        # Bucket 1 verification
+        b1 = data[0]
+        assert b1["channel_id"] == str(channel.id)
+        assert b1["interval"] == "15min"
+        assert b1["reading_count"] == 3
+        assert b1["average_value"] == pytest.approx(120.0)
+        assert b1["minimum_value"] == pytest.approx(100.0)
+        assert b1["maximum_value"] == pytest.approx(140.0)
+
+        # Bucket 2 verification
+        b2 = data[1]
+        assert b2["channel_id"] == str(channel.id)
+        assert b2["interval"] == "15min"
+        assert b2["reading_count"] == 1
+        assert b2["average_value"] == pytest.approx(200.0)
+        assert b2["minimum_value"] == pytest.approx(200.0)
+        assert b2["maximum_value"] == pytest.approx(200.0)
+    finally:
+        db_session.close()
+
+
+def test_readings_aggregate_all_intervals(client):
+    """Verify that all supported intervals (5min, 15min, hour, day, week) succeed."""
+    db_session = SessionLocal()
+    try:
+        org = Organization(name=f"Org All Intervals {uuid4()}")
+        db_session.add(org)
+        db_session.flush()
+
+        user = User(
+            org_id=org.id,
+            email=f"user_{uuid4()}@example.com",
+            password_hash="hashed",
+            full_name="All Intervals Tester",
+            role="engineer",
+        )
+        db_session.add(user)
+        db_session.flush()
+
+        plant = Plant(name="Plant All Intervals", org_id=org.id, plant_type="solar")
+        db_session.add(plant)
+        db_session.flush()
+
+        asset = Asset(name="Inverter All Intervals", plant_id=plant.id, asset_type="inverter")
+        db_session.add(asset)
+        db_session.flush()
+
+        channel = Channel(
+            asset_id=asset.id,
+            canonical_key="power_ac",
+            source_name="AC_POWER",
+            receive_unit="kW",
+            interval_s=300,
+        )
+        db_session.add(channel)
+        db_session.flush()
+
+        t1 = datetime(2020, 5, 15, 10, 0, tzinfo=timezone.utc)
+        r1 = Reading(channel_id=channel.id, ts=t1, value=500.0)
+        db_session.add(r1)
+        db_session.commit()
+
+        token = create_access_token({"sub": str(user.id), "org_id": str(org.id), "role": "engineer"})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        for inv in ["5min", "15min", "hour", "day", "week"]:
+            res = client.get(
+                f"/readings/aggregate?channel_id={channel.id}&start=2020-05-15T00:00:00Z&end=2020-05-15T23:59:59Z&interval={inv}",
+                headers=headers,
+            )
+            assert res.status_code == 200, f"Failed for interval {inv}"
+            data = res.json()
+            assert len(data) >= 1
+            assert data[0]["interval"] == inv
+            assert data[0]["average_value"] == pytest.approx(500.0)
+    finally:
+        db_session.close()
+
+
+def test_readings_aggregate_invalid_interval(client):
+    """Verify that an invalid interval parameter is rejected with 400 Bad Request."""
+    db_session = SessionLocal()
+    try:
+        org = Organization(name=f"Org Invalid Inv {uuid4()}")
+        db_session.add(org)
+        db_session.flush()
+
+        user = User(
+            org_id=org.id,
+            email=f"user_{uuid4()}@example.com",
+            password_hash="hashed",
+            full_name="Invalid Inv Tester",
+            role="engineer",
+        )
+        db_session.add(user)
+        db_session.flush()
+
+        plant = Plant(name="Plant Invalid Inv", org_id=org.id, plant_type="solar")
+        db_session.add(plant)
+        db_session.flush()
+
+        asset = Asset(name="Inverter Invalid Inv", plant_id=plant.id, asset_type="inverter")
+        db_session.add(asset)
+        db_session.flush()
+
+        channel = Channel(
+            asset_id=asset.id,
+            canonical_key="power_ac",
+            source_name="AC_POWER",
+            receive_unit="kW",
+            interval_s=300,
+        )
+        db_session.add(channel)
+        db_session.commit()
+
+        token = create_access_token({"sub": str(user.id), "org_id": str(org.id), "role": "engineer"})
+        headers = {"Authorization": f"Bearer {token}"}
+
+        res = client.get(
+            f"/readings/aggregate?channel_id={channel.id}&start=2020-05-15T00:00:00Z&end=2020-05-15T23:59:59Z&interval=invalid_interval",
+            headers=headers,
+        )
+        assert res.status_code == 400
+        assert "Invalid interval. Use one of: 5min, 15min, hour, day, week" in res.json()["detail"]
+    finally:
+        db_session.close()
+
+
+def test_readings_aggregate_channel_filtering_and_org_isolation(client):
+    """Verify channel filtering and org isolation for aggregate readings."""
+    db_session = SessionLocal()
+    try:
+        # Org 1
+        org1 = Organization(name=f"Org 1 Iso {uuid4()}")
+        db_session.add(org1)
+        db_session.flush()
+
+        user1 = User(
+            org_id=org1.id,
+            email=f"user1_{uuid4()}@example.com",
+            password_hash="hashed",
+            full_name="User 1 Iso",
+            role="engineer",
+        )
+        plant1 = Plant(name="Plant 1 Iso", org_id=org1.id, plant_type="solar")
+        db_session.add_all([user1, plant1])
+        db_session.flush()
+
+        asset1 = Asset(name="Asset 1 Iso", plant_id=plant1.id, asset_type="inverter")
+        db_session.add(asset1)
+        db_session.flush()
+
+        ch1 = Channel(asset_id=asset1.id, canonical_key="power_ac", source_name="AC1", receive_unit="kW", interval_s=300)
+        db_session.add(ch1)
+        db_session.flush()
+
+        # Org 2
+        org2 = Organization(name=f"Org 2 Iso {uuid4()}")
+        db_session.add(org2)
+        db_session.flush()
+
+        user2 = User(
+            org_id=org2.id,
+            email=f"user2_{uuid4()}@example.com",
+            password_hash="hashed",
+            full_name="User 2 Iso",
+            role="engineer",
+        )
+        plant2 = Plant(name="Plant 2 Iso", org_id=org2.id, plant_type="solar")
+        db_session.add_all([user2, plant2])
+        db_session.flush()
+
+        asset2 = Asset(name="Asset 2 Iso", plant_id=plant2.id, asset_type="inverter")
+        db_session.add(asset2)
+        db_session.flush()
+
+        ch2 = Channel(asset_id=asset2.id, canonical_key="power_ac", source_name="AC2", receive_unit="kW", interval_s=300)
+        db_session.add(ch2)
+        db_session.flush()
+
+        # Readings
+        t = datetime(2020, 5, 15, 12, 0, tzinfo=timezone.utc)
+        r1 = Reading(channel_id=ch1.id, ts=t, value=100.0)
+        r2 = Reading(channel_id=ch2.id, ts=t, value=200.0)
+        db_session.add_all([r1, r2])
+        db_session.commit()
+
+        token1 = create_access_token({"sub": str(user1.id), "org_id": str(org1.id), "role": "engineer"})
+        token2 = create_access_token({"sub": str(user2.id), "org_id": str(org2.id), "role": "engineer"})
+
+        h1 = {"Authorization": f"Bearer {token1}"}
+        h2 = {"Authorization": f"Bearer {token2}"}
+
+        # User 1 can query channel 1
+        res1 = client.get(f"/readings/aggregate?channel_id={ch1.id}&start=2020-05-15T00:00:00Z&end=2020-05-15T23:59:59Z&interval=15min", headers=h1)
+        assert res1.status_code == 200
+        assert res1.json()[0]["average_value"] == pytest.approx(100.0)
+
+        # User 2 CANNOT query channel 1 -> 403 Forbidden
+        res_cross = client.get(f"/readings/aggregate?channel_id={ch1.id}&start=2020-05-15T00:00:00Z&end=2020-05-15T23:59:59Z&interval=15min", headers=h2)
+        assert res_cross.status_code == 403
+
+    finally:
+        db_session.close()

@@ -22,6 +22,7 @@ export interface ChartPoint {
 interface GenerationChartProps {
   data: ChartPoint[];
   loading?: boolean;
+  onRangeChange?: (range: '24H' | '7D' | '30D') => void;
 }
 
 const formatMonthDay = (date: Date): string => {
@@ -69,7 +70,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export const GenerationChart: React.FC<GenerationChartProps> = ({ data, loading }) => {
+export const GenerationChart: React.FC<GenerationChartProps> = ({ data, loading, onRangeChange }) => {
   const [timeRange, setTimeRange] = useState<'24H' | '7D' | '30D'>('24H');
 
   // Process data, calculate KPIs dynamically for active timeRange, and downsample for optimal visualization
@@ -257,7 +258,10 @@ export const GenerationChart: React.FC<GenerationChartProps> = ({ data, loading 
               <button
                 key={range}
                 type="button"
-                onClick={() => setTimeRange(range)}
+                onClick={() => {
+                  setTimeRange(range);
+                  onRangeChange?.(range);
+                }}
                 className={`px-2.5 py-1 rounded font-bold transition ${
                   timeRange === range
                     ? 'bg-white text-slate-900 shadow-xs'

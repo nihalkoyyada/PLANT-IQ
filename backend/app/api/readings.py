@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, literal_column, select
+from sqlalchemy import func, literal_column, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -249,6 +249,7 @@ def get_readings_aggregate(
 
     allowed_intervals = {
         "5min": 5,
+        "15min": 15,
         "hour": 60,
         "day": 1440,
         "week": 10080,
@@ -257,7 +258,7 @@ def get_readings_aggregate(
     if interval not in allowed_intervals:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid interval. Use one of: 5min, hour, day, week",
+            detail="Invalid interval. Use one of: 5min, 15min, hour, day, week",
         )
 
     if start > end:
@@ -266,71 +267,104 @@ def get_readings_aggregate(
             detail="Start must be before or equal to end",
         )
 
-    bucket_minutes = allowed_intervals[interval]
+    view_map = {
+        "5min": "readings_5min",
+        "15min": "readings_15min",
+        "hour": "readings_1hour",
+        "day": "readings_1day",
+        "week": "readings_1week",
+    }
 
     dialect_name = db.bind.dialect.name
-    if dialect_name == "postgresql":
+    results = None
+
+    if dialect_name == "postgresql" and interval in view_map:
+        view_name = view_map[interval]
         try:
-            bucket_expression = func.time_bucket(
-                literal_column(f"INTERVAL '{bucket_minutes} minutes'"),
-                Reading.ts,
-            )
+            cagg_query = text(f"""
+                SELECT bucket, reading_count, average_value, minimum_value, maximum_value
+                FROM {view_name}
+                WHERE (channel_id = :cid_uuid OR channel_id = :cid_str)
+                  AND bucket >= :start
+                  AND bucket <= :end
+                ORDER BY bucket ASC
+            """)
+            cagg_res = db.execute(cagg_query, {
+                "cid_uuid": channel_id,
+                "cid_str": str(channel_id),
+                "start": start,
+                "end": end,
+            }).all()
+            if cagg_res:
+                results = [
+                    ReadingAggregateResponse(
+                        channel_id=channel_id,
+                        interval=interval,
+                        start=row.bucket,
+                        end=row.bucket,
+                        reading_count=row.reading_count,
+                        average_value=float(row.average_value) if row.average_value is not None else None,
+                        minimum_value=float(row.minimum_value) if row.minimum_value is not None else None,
+                        maximum_value=float(row.maximum_value) if row.maximum_value is not None else None,
+                    )
+                    for row in cagg_res
+                ]
         except Exception:
+            results = None
+
+    if results is None:
+        bucket_minutes = allowed_intervals[interval]
+        if dialect_name == "postgresql":
+            try:
+                bucket_expression = func.time_bucket(
+                    literal_column(f"INTERVAL '{bucket_minutes} minutes'"),
+                    Reading.ts,
+                )
+            except Exception:
+                bucket_seconds = bucket_minutes * 60
+                bucket_expression = func.to_timestamp(
+                    func.floor(func.extract("epoch", Reading.ts) / bucket_seconds) * bucket_seconds
+                )
+        else:
             bucket_seconds = bucket_minutes * 60
-            bucket_expression = func.to_timestamp(
-                func.floor(func.extract("epoch", Reading.ts) / bucket_seconds) * bucket_seconds
+            bucket_expression = func.datetime(
+                (func.strftime("%s", Reading.ts) / bucket_seconds) * bucket_seconds,
+                "unixepoch",
             )
-    else:
-        bucket_seconds = bucket_minutes * 60
-        bucket_expression = func.datetime(
-            (func.strftime("%s", Reading.ts) / bucket_seconds) * bucket_seconds,
-            "unixepoch",
+
+        query = (
+            select(
+                bucket_expression.label("bucket"),
+                func.count(Reading.value).label("reading_count"),
+                func.avg(Reading.value).label("average_value"),
+                func.min(Reading.value).label("minimum_value"),
+                func.max(Reading.value).label("maximum_value"),
+            )
+            .where(
+                (Reading.channel_id == channel_id) | (Reading.channel_id == str(channel_id)),
+                Reading.ts >= start,
+                Reading.ts <= end,
+            )
+            .group_by(bucket_expression)
+            .order_by(bucket_expression.asc())
         )
 
-    query = (
-        select(
-            bucket_expression.label("bucket"),
-            func.count(Reading.value).label("reading_count"),
-            func.avg(Reading.value).label("average_value"),
-            func.min(Reading.value).label("minimum_value"),
-            func.max(Reading.value).label("maximum_value"),
-        )
-        .where(
-            (Reading.channel_id == channel_id) | (Reading.channel_id == str(channel_id)),
-            Reading.ts >= start,
-            Reading.ts <= end,
-        )
-        .group_by(bucket_expression)
-        .order_by(bucket_expression.asc())
-    )
+        rows = db.execute(query).all()
+        results = [
+            ReadingAggregateResponse(
+                channel_id=channel_id,
+                interval=interval,
+                start=row.bucket,
+                end=row.bucket,
+                reading_count=row.reading_count,
+                average_value=float(row.average_value) if row.average_value is not None else None,
+                minimum_value=float(row.minimum_value) if row.minimum_value is not None else None,
+                maximum_value=float(row.maximum_value) if row.maximum_value is not None else None,
+            )
+            for row in rows
+        ]
 
-    result = db.execute(query).all()
-
-    return [
-        ReadingAggregateResponse(
-            channel_id=channel_id,
-            interval=interval,
-            start=row.bucket,
-            end=row.bucket,
-            reading_count=row.reading_count,
-            average_value=(
-                float(row.average_value)
-                if row.average_value is not None
-                else None
-            ),
-            minimum_value=(
-                float(row.minimum_value)
-                if row.minimum_value is not None
-                else None
-            ),
-            maximum_value=(
-                float(row.maximum_value)
-                if row.maximum_value is not None
-                else None
-            ),
-        )
-        for row in result
-    ]
+    return results
 
 
 @router.get(

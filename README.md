@@ -75,36 +75,59 @@ The backend provides a complete solar telemetry ingestion and analytics pipeline
 
 ---
 
+### 4. Sprint 4: Anomaly Detection Engine & CARE Benchmark Suite
+* **Detector Framework Registry (`backend/app/ai/detector_registry.py`)**:
+  * Extensible decorator-based plugin architecture (`@register_detector`) for discovering and invoking anomaly detection algorithms.
+  * Includes automated deduplication engine (`backend/app/ai/anomaly_dedup.py`), severity tiers (`SeverityPolicy`), and financial loss estimation (`FinancialLossPolicy`).
+* **Physics & Machine Learning Algorithms (D1 through D4)**:
+  * **D1 Statistical Outlier (`d1_statistical`):** Vectorized moving Z-score and Interquartile Range (IQR) checks to catch telemetry spikes, drops, and physically impossible readings.
+  * **D2 PR Deviation (`d2_pr_deviation`):** Real-time Performance Ratio deviation detector referencing on-site pyranometers or diurnal reference curves with root-cause classification.
+  * **D3 Irradiance-Residual (`d3_irradiance_residual`):** Clear-sky solar radiation model and robust regression analysis to isolate soiling, degradation, and module obstruction from natural cloud cover.
+  * **D4 Isolation Forest (`d4_isolation_forest`):** Unsupervised Scikit-Learn `IsolationForest` fitting per-asset models across 7 multi-variable rolling window features with 3-interval persistence verification.
+* **CARE Benchmark Harness & Reporting (`backend/scripts/run_care_benchmark.py`, `backend/app/ai/care_benchmark.py`)**:
+  * Automated benchmarking evaluating D1–D4, rule baselines, and multi-model ensembles against verified ground-truth fault catalogs (`Datasets/ground_truth_anomalies.json`).
+  * Computes classification metrics (Precision, Recall, F1, False Alarm Rate) and early warning Lead-Time metrics.
+  * Programmatically generates executive Markdown artifacts (`docs/care-benchmark-report.md`) for stakeholder reviews and project pitches.
+
+---
+
 ## 🧪 How to Run & Verify the Backend
 
 All backend dependencies are managed inside the project virtual environment (`.venv`).
 
-### 1. Run Backend Automated Test Suite (160+ Tests)
+### 1. Run Backend Automated Test Suite (218+ Tests)
 ```bash
 cd backend
-../.venv/bin/pytest tests/ai tests/scripts -v
+./venv/bin/pytest tests/ai tests/scripts -v
 ```
 
-### 2. Run NREL PVDAQ Benchmark Validation
+### 2. Run CARE Benchmark Harness (S4-AI-05)
 ```bash
 cd backend
-../.venv/bin/python scripts/validate_pvdaq_benchmark.py
+./venv/bin/python scripts/run_care_benchmark.py
 ```
 
-### 3. Run Ingestion Throughput Benchmark
+### 3. Run NREL PVDAQ Benchmark Validation
 ```bash
 cd backend
-../.venv/bin/python scripts/test_ingest_throughput.py
+./venv/bin/python scripts/validate_pvdaq_benchmark.py
 ```
 
-### 4. Run Historical KPI Backfill CLI
+### 4. Run Ingestion Throughput Benchmark
 ```bash
 cd backend
-../.venv/bin/python scripts/backfill_kpis.py --start-date 2023-06-01 --end-date 2023-06-06 --dry-run
+./venv/bin/python scripts/test_ingest_throughput.py
 ```
 
-### 5. Start FastAPI Dev Server
+### 5. Run Historical KPI Backfill CLI
 ```bash
 cd backend
-../.venv/bin/uvicorn app.main:app --reload --port 8000
+./venv/bin/python scripts/backfill_kpis.py --start-date 2023-06-01 --end-date 2023-06-06 --dry-run
 ```
+
+### 6. Start FastAPI Dev Server
+```bash
+cd backend
+./venv/bin/uvicorn app.main:app --reload --port 8000
+```
+

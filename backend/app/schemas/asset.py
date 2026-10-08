@@ -33,6 +33,29 @@ class AssetCreate(AssetBase):
     plant_id: UUID
 
 
+class AssetUpdate(BaseModel):
+    name: str | None = None
+    asset_type: (
+        Literal[
+            "plant",
+            "block",
+            "inverter",
+            "string",
+            "transformer",
+            "meter",
+            "weather_station",
+            "turbine",
+            "sensor",
+        ]
+        | None
+    ) = None
+    parent_id: UUID | None = None
+    make: str | None = None
+    model: str | None = None
+    rated_kw: float | None = None
+    metadata: dict | None = None
+
+
 class AssetResponse(AssetBase):
     id: UUID
     plant_id: UUID

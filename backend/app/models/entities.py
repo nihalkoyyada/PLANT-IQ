@@ -886,3 +886,196 @@ class KPIValue(Base):
 
     plant: Mapped["Plant"] = relationship("Plant", back_populates="kpi_values")
     asset: Mapped[Optional["Asset"]] = relationship("Asset", back_populates="kpi_values")
+
+
+class Event(Base):
+    """Event / Alert entity recording operational events, faults, warnings, and system logs."""
+
+    __tablename__ = "events"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    asset_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("assets.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="scada",
+        server_default="scada",
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="fault",
+        server_default="fault",
+    )
+    severity: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="info",
+        server_default="info",
+    )
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    end_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    code: Mapped[Optional[str]] = mapped_column(
+        String(64),
+        nullable=True,
+    )
+    message: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    metadata_json: Mapped[dict] = mapped_column(
+        "metadata",
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    plant: Mapped["Plant"] = relationship("Plant")
+    asset: Mapped[Optional["Asset"]] = relationship("Asset")
+
+    def __init__(self, **kwargs: Any) -> None:
+        if "metadata" in kwargs:
+            kwargs["metadata_json"] = kwargs.pop("metadata")
+        super().__init__(**kwargs)
+
+
+class Detector(Base):
+    """Anomaly Detector configuration entity."""
+
+    __tablename__ = "detectors"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    method: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    canonical_key: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("canonical_signals.key"),
+        nullable=False,
+    )
+    asset_scope: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default='{"asset_type": "inverter"}',
+        default=lambda: {"asset_type": "inverter"},
+    )
+    parameters: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=dict,
+    )
+    condition_text: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=">= 0",
+        default=">= 0",
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+        default=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    plant: Mapped["Plant"] = relationship("Plant")
+    canonical_signal: Mapped["CanonicalSignal"] = relationship("CanonicalSignal")
+
+    __table_args__ = (
+        CheckConstraint(
+            "method IN ('zscore', 'iqr', 'deviation', 'isolation_forest')",
+            name="ck_detectors_method",
+        ),
+    )
+
+
+class AuditLog(Base):
+    """Security and operational audit log record matching existing audit_log table."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    action: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    entity: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    entity_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        nullable=True,
+    )
+    details: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=dict,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    user: Mapped[Optional["User"]] = relationship("User")

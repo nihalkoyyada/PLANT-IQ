@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models import Asset, Plant, User
-from app.schemas.asset import AssetCreate, AssetResponse
+from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse
 from app.api.deps import get_current_user, require_role, enforce_org_access
 
 
@@ -107,3 +107,93 @@ def get_asset(
     enforce_org_access(current_user, asset.plant.org_id)
 
     return asset
+
+
+@router.put(
+    "/{asset_id}",
+    response_model=AssetResponse,
+)
+@router.patch(
+    "/{asset_id}",
+    response_model=AssetResponse,
+)
+def update_asset(
+    asset_id: UUID,
+    asset_update: AssetUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "engineer")),
+):
+    asset = db.get(Asset, asset_id)
+
+    if asset is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found",
+        )
+
+    enforce_org_access(current_user, asset.plant.org_id)
+
+    update_data = asset_update.model_dump(exclude_unset=True)
+
+    if "parent_id" in update_data and update_data["parent_id"] is not None:
+        parent_asset = db.get(Asset, update_data["parent_id"])
+        if parent_asset is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Parent asset not found",
+            )
+        if parent_asset.plant_id != asset.plant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Parent asset belongs to a different plant",
+            )
+
+    if "metadata" in update_data:
+        metadata_val = update_data.pop("metadata")
+        if metadata_val is not None:
+            asset.metadata_ = metadata_val
+
+    for key, value in update_data.items():
+        if hasattr(asset, key) and value is not None:
+            setattr(asset, key, value)
+
+    db.commit()
+    db.refresh(asset)
+
+    return asset
+
+
+@router.delete(
+    "/{asset_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_asset(
+    asset_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "engineer")),
+):
+    asset = db.get(Asset, asset_id)
+
+    if asset is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Asset not found",
+        )
+
+    enforce_org_access(current_user, asset.plant.org_id)
+
+    # Dependency protection
+    from app.models import Channel
+
+    has_children = db.execute(select(Asset).where(Asset.parent_id == asset.id)).scalars().first() is not None
+    has_channels = db.execute(select(Channel).where(Channel.asset_id == asset.id)).scalars().first() is not None
+
+    if has_children or has_channels:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete asset with child assets or associated channels. Remove dependent resources first.",
+        )
+
+    db.delete(asset)
+    db.commit()
+    return None

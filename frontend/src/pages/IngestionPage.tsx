@@ -78,7 +78,18 @@ export const IngestionPage: React.FC = () => {
       });
 
       setProfileData(profileRes);
-      setActiveStep(3);
+
+      try {
+        const jobsForFile = await getIngestionJobs(fileRecord.id);
+        const hasCompletedJob = jobsForFile.some((j) => j.status === 'completed' || j.status === 'done');
+        if (hasCompletedJob) {
+          setActiveStep(6);
+        } else {
+          setActiveStep(3);
+        }
+      } catch (jobErr) {
+        setActiveStep(3);
+      }
     } catch (err: any) {
       console.error('Profiling file failed:', err);
       const detail = err.response?.data?.detail || err.message || 'Profiling failed';
@@ -110,11 +121,18 @@ export const IngestionPage: React.FC = () => {
       return;
     }
 
-    loadFiles();
+    const initPage = async () => {
+      const filesRes = await loadFiles();
+      if (filesRes && filesRes.length > 0) {
+        await selectAndProfileFile(filesRes[0]);
+      }
 
-    getIngestionJobs()
-      .then((jobsRes) => setJobs(jobsRes))
-      .catch((err) => console.warn('Failed to load ingestion jobs:', err));
+      getIngestionJobs()
+        .then((jobsRes) => setJobs(jobsRes))
+        .catch((err) => console.warn('Failed to load ingestion jobs:', err));
+    };
+
+    initPage();
   }, [authLoading, isAuthenticated, loadFiles]);
 
   if (!canUpload && !authLoading) {

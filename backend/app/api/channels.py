@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models import Asset, CanonicalSignal, Channel, Plant, User
-from app.schemas.channel import ChannelCreate, ChannelResponse
+from app.schemas.channel import ChannelCreate, ChannelUpdate, ChannelResponse
 from app.api.deps import get_current_user, require_role, enforce_org_access
 
 
@@ -117,3 +117,82 @@ def get_channel(
     enforce_org_access(current_user, channel.asset.plant.org_id)
 
     return channel
+
+
+@router.put(
+    "/{channel_id}",
+    response_model=ChannelResponse,
+)
+@router.patch(
+    "/{channel_id}",
+    response_model=ChannelResponse,
+)
+def update_channel(
+    channel_id: UUID,
+    channel_update: ChannelUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "engineer")),
+):
+    channel = db.get(Channel, channel_id)
+
+    if channel is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Channel not found",
+        )
+
+    enforce_org_access(current_user, channel.asset.plant.org_id)
+
+    update_data = channel_update.model_dump(exclude_unset=True)
+
+    if "canonical_key" in update_data and update_data["canonical_key"] is not None:
+        canonical_signal = db.get(CanonicalSignal, update_data["canonical_key"])
+        if canonical_signal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Canonical signal not found",
+            )
+
+    for key, value in update_data.items():
+        if hasattr(channel, key) and value is not None:
+            setattr(channel, key, value)
+
+    db.commit()
+    db.refresh(channel)
+
+    return channel
+
+
+@router.delete(
+    "/{channel_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_channel(
+    channel_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "engineer")),
+):
+    channel = db.get(Channel, channel_id)
+
+    if channel is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Channel not found",
+        )
+
+    enforce_org_access(current_user, channel.asset.plant.org_id)
+
+    # Dependency protection
+    from app.models import Reading
+
+    has_readings = db.execute(select(Reading).where(Reading.channel_id == channel.id).limit(1)).scalars().first() is not None
+
+    if has_readings:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete channel with recorded telemetry readings. Remove or archive readings first.",
+        )
+
+    db.delete(channel)
+    db.commit()
+    return None

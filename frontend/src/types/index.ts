@@ -210,4 +210,113 @@ export interface QCStatsResponse {
   hypertable_active: boolean;
 }
 
+export interface PlantIQEvent {
+  id: string;
+  plant_id: string;
+  asset_id?: string | null;
+  source: string;
+  event_type: string;
+  severity: 'info' | 'warning' | 'critical' | 'error' | string;
+  start_time: string;
+  end_time?: string | null;
+  code?: string | null;
+  message: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
 
+export interface EventCreateRequest {
+  plant_id: string;
+  asset_id?: string | null;
+  source?: string;
+  event_type?: string;
+  severity?: string;
+  start_time: string;
+  end_time?: string | null;
+  code?: string | null;
+  message: string;
+  metadata?: Record<string, any>;
+}
+
+export interface EventImportSummary {
+  total_rows: number;
+  imported_rows: number;
+  failed_rows: number;
+  validation_errors: Array<{
+    row: number;
+    error: string;
+    data?: Record<string, any>;
+  }>;
+}
+
+export interface PRHeatmapCell {
+  timestamp: string;
+  label: string;
+  pr: number | null;
+  pr_pct: string;
+  status: 'healthy' | 'moderate' | 'degraded' | 'missing_data' | string;
+  has_data: boolean;
+  ac_kw: number | null;
+  dc_kw: number | null;
+}
+
+export interface PRHeatmapRow {
+  asset_id: string;
+  asset_name: string;
+  cells: PRHeatmapCell[];
+}
+
+export interface PRHeatmapResponse {
+  plant_id: string;
+  range: string;
+  time_buckets: string[];
+  inverters: PRHeatmapRow[];
+}
+
+export interface TopLosersItem {
+  rank: number;
+  asset_id: string;
+  asset_name: string;
+  expected_mwh: number;
+  actual_mwh: number;
+  loss_mwh: number;
+  loss_pct: number;
+  pr: number | null;
+  has_data: boolean;
+}
+
+export interface LossAnalysisResponse {
+  plant_id: string;
+  range: string;
+  total_expected_mwh: number;
+  total_actual_mwh: number;
+  total_loss_mwh: number;
+  total_loss_pct: number;
+  has_data: boolean;
+  plant_pr?: number | null;
+  losers: TopLosersItem[];
+}
+
+export interface CanonicalSignal {
+  key: string;
+  name: string;
+  category: string;
+  unit: string;
+  y_min?: number | null;
+  y_max?: number | null;
+  applicable_types: string[];
+  description?: string | null;
+}
+
+export interface Detector {
+  id: string;
+  plant_id: string;
+  name: string;
+  method: 'zscore' | 'iqr' | 'deviation' | 'isolation_forest' | string;
+  canonical_key: string;
+  asset_scope: Record<string, any>;
+  parameters: Record<string, any>;
+  condition_text: string;
+  enabled: boolean;
+  created_at: string;
+}

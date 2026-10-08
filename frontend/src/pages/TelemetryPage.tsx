@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -6,6 +6,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import {
@@ -15,27 +16,109 @@ import {
   CalendarDays,
   RefreshCw,
   AlertCircle,
+  Search,
+  ChevronDown,
+  Check,
+  X,
+  Download,
+  Zap,
+  Sun,
+  Layers,
+  Trash2,
 } from 'lucide-react';
 
 import { Badge } from '../components/common/Badge';
+import { AssetTree } from '../components/telemetry/AssetTree';
 import { getChannels } from '../api/channels';
+import { getAssets } from '../api/assets';
+import { getPlants } from '../api/plants';
 import { getReadingAggregate } from '../api/readings';
-import { Channel, ReadingAggregate } from '../types';
+import { Channel, Asset, Plant, ReadingAggregate } from '../types';
+
+/* =========================================================
+ * COLOR PALETTE & HELPER FUNCTIONS
+ * ========================================================= */
+
+const STROKE_COLORS = [
+  '#0284c7', // Sky Blue
+  '#10b981', // Emerald Green
+  '#f59e0b', // Amber
+  '#ef4444', // Rose Red
+  '#8b5cf6', // Violet
+  '#ec4899', // Pink
+  '#14b8a6', // Teal
+  '#f97316', // Orange
+  '#3b82f6', // Blue
+  '#6366f1', // Indigo
+];
+
+const getHumanMetricName = (canonicalKey: string, sourceName: string): string => {
+  const key = (canonicalKey || '').toLowerCase();
+  const src = (sourceName || '').toUpperCase();
+
+  if (key === 'power_ac' || src.includes('AC_POWER') || src.includes('AC POWER')) {
+    return 'AC Power';
+  }
+  if (key === 'power_dc' || src.includes('DC_POWER') || src.includes('DC POWER')) {
+    return 'DC Power';
+  }
+  if (
+    key === 'energy_ac_daily' ||
+    key === 'daily_yield' ||
+    src.includes('DAILY_YIELD') ||
+    src.includes('DAILY YIELD')
+  ) {
+    return 'Daily Energy';
+  }
+  if (
+    key === 'energy_ac_total' ||
+    key === 'total_yield' ||
+    src.includes('TOTAL_YIELD') ||
+    src.includes('TOTAL YIELD')
+  ) {
+    return 'Total Energy';
+  }
+  if (key === 'irradiance' || src.includes('IRRADIANCE')) {
+    return 'Irradiance';
+  }
+  if (key.includes('temp') || src.includes('TEMP')) {
+    return 'Temperature';
+  }
+
+  const raw = canonicalKey || sourceName || 'Signal';
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getAssetNameForChannel = (channel: Channel, assetsList: Asset[]): string => {
+  if (channel.asset_id) {
+    const found = assetsList.find((a) => a.id === channel.asset_id);
+    if (found && found.name) return found.name;
+  }
+  return 'Inverter';
+};
+
+/* =========================================================
+ * MAIN TELEMETRY PAGE COMPONENT (S3-FS-02 UI-05 EXPLORER)
+ * ========================================================= */
 
 export const TelemetryPage: React.FC = () => {
+  const [plants, setPlants] = useState<Plant[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedChannelIds, setSelectedChannelIds] = useState<string[]>([]);
 
-  const [interval, setInterval] = useState<
-    '5min' | 'hour' | 'day' | 'week'
-  >('hour');
+  const [interval, setInterval] = useState<'5min' | '15min' | 'hour' | 'day' | 'week'>('hour');
 
   const [startDate, setStartDate] = useState<string>('2020-05-15');
   const [endDate, setEndDate] = useState<string>('2020-06-18');
 
-  const [aggregateData, setAggregateData] = useState<ReadingAggregate[]>([]);
+  // Channel ID -> ReadingAggregate[]
+  const [channelDataMap, setChannelDataMap] = useState<Record<string, ReadingAggregate[]>>({});
 
   const [loading, setLoading] = useState<boolean>(false);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
 
   const [appliedRange, setAppliedRange] = useState({
@@ -43,45 +126,127 @@ export const TelemetryPage: React.FC = () => {
     end: '2020-06-18',
   });
 
+  const [activeTableChannelId, setActiveTableChannelId] = useState<string>('');
+
   /*
-   * Load channels
+   * Fetch initial structure: Plants, Assets, Channels
    */
   useEffect(() => {
-    async function fetchChannels() {
+    async function fetchInitialData() {
       try {
-        const chans = await getChannels();
+        setInitialLoading(true);
+        const [plantsList, chans, asts] = await Promise.all([
+          getPlants().catch(() => [] as Plant[]),
+          getChannels(),
+          getAssets().catch(() => [] as Asset[]),
+        ]);
 
+        setPlants(plantsList);
         setChannels(chans);
+        setAssets(asts);
 
+        // Select first 2 power channels by default if available
         if (chans.length > 0) {
-          setSelectedChannelId(chans[0].id);
+          const powerChans = chans.filter(
+            (c) => c.canonical_key === 'power_ac' || c.canonical_key === 'power_dc'
+          );
+          if (powerChans.length >= 2) {
+            setSelectedChannelIds([powerChans[0].id, powerChans[1].id]);
+          } else {
+            setSelectedChannelIds([chans[0].id]);
+          }
         } else {
-          setSelectedChannelId('');
+          setSelectedChannelIds([]);
         }
       } catch (err) {
-        console.error('Failed to fetch channels:', err);
+        console.error('Failed to fetch initial telemetry structure:', err);
+        setPlants([]);
         setChannels([]);
-        setSelectedChannelId('');
-        setError('Unable to load telemetry channels.');
+        setAssets([]);
+        setSelectedChannelIds([]);
+        setError('Unable to load telemetry structure.');
+      } finally {
+        setInitialLoading(false);
       }
     }
 
-    fetchChannels();
+    fetchInitialData();
   }, []);
 
   /*
-   * Fetch telemetry whenever:
-   * - channel changes
-   * - interval changes
-   * - applied date range changes
+   * Map channels to detailed metadata for labels, units, and legend formatting
+   */
+  const channelInfoMap = useMemo(() => {
+    const map: Record<
+      string,
+      {
+        id: string;
+        assetName: string;
+        metricName: string;
+        displayName: string;
+        unit: string;
+        canonicalKey: string;
+        sourceName: string;
+        color: string;
+      }
+    > = {};
+
+    channels.forEach((ch, idx) => {
+      const assetName = getAssetNameForChannel(ch, assets);
+      const metricName = getHumanMetricName(ch.canonical_key, ch.source_name);
+      const defaultUnit = metricName.includes('Energy') ? 'kWh' : 'kW';
+      const unit = ch.receive_unit || defaultUnit;
+
+      map[ch.id] = {
+        id: ch.id,
+        assetName,
+        metricName,
+        displayName: `${assetName} — ${metricName}`,
+        unit,
+        canonicalKey: ch.canonical_key,
+        sourceName: ch.source_name,
+        color: STROKE_COLORS[idx % STROKE_COLORS.length],
+      };
+    });
+
+    return map;
+  }, [channels, assets]);
+
+  /*
+   * List of currently selected channel objects
+   */
+  const selectedChannelsInfo = useMemo(() => {
+    return selectedChannelIds
+      .map((id, idx) => {
+        const info = channelInfoMap[id];
+        if (!info) return null;
+        return {
+          ...info,
+          color: STROKE_COLORS[idx % STROKE_COLORS.length],
+        };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      assetName: string;
+      metricName: string;
+      displayName: string;
+      unit: string;
+      canonicalKey: string;
+      sourceName: string;
+      color: string;
+    }>;
+  }, [selectedChannelIds, channelInfoMap]);
+
+  /*
+   * Fetch aggregate data in parallel for ALL selected channels whenever selected channels, interval, or date range changes
    */
   useEffect(() => {
-    if (!selectedChannelId) {
-      setAggregateData([]);
+    if (selectedChannelIds.length === 0) {
+      setChannelDataMap({});
       return;
     }
 
-    async function fetchAggregate() {
+    async function fetchAllAggregates() {
       try {
         setLoading(true);
         setError('');
@@ -89,58 +254,129 @@ export const TelemetryPage: React.FC = () => {
         const start = `${appliedRange.start}T00:00:00Z`;
         const end = `${appliedRange.end}T23:59:59Z`;
 
-        const data = await getReadingAggregate({
-          channel_id: selectedChannelId,
-          start,
-          end,
-          interval,
+        const results = await Promise.all(
+          selectedChannelIds.map(async (channelId) => {
+            try {
+              const data = await getReadingAggregate({
+                channel_id: channelId,
+                start,
+                end,
+                interval,
+              });
+              return { channelId, data };
+            } catch (err) {
+              console.warn(`Error fetching aggregate for channel ${channelId}:`, err);
+              return { channelId, data: [] };
+            }
+          })
+        );
+
+        const newMap: Record<string, ReadingAggregate[]> = {};
+        results.forEach(({ channelId, data }) => {
+          newMap[channelId] = data;
         });
 
-        setAggregateData(data);
+        setChannelDataMap(newMap);
       } catch (err: any) {
-        console.error('Error fetching telemetry aggregate:', err);
-
-        setAggregateData([]);
-
-        const apiMessage =
-          err?.response?.data?.detail ||
-          err?.message ||
-          'Unable to load telemetry data.';
-
-        setError(String(apiMessage));
+        console.error('Error fetching telemetry aggregates:', err);
+        setChannelDataMap({});
+        setError('Unable to load telemetry data for selected channels.');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchAggregate();
-  }, [
-    selectedChannelId,
-    interval,
-    appliedRange.start,
-    appliedRange.end,
-  ]);
+    fetchAllAggregates();
+  }, [selectedChannelIds, interval, appliedRange.start, appliedRange.end]);
 
   /*
-   * Apply selected date range
+   * TIMESTAMP ALIGNMENT LOGIC (Crucial S3-FS-02 Requirement)
+   * Builds timestamp-keyed map combining values from all selected channels without assuming array index ordering.
+   */
+  const alignedChartPoints = useMemo(() => {
+    if (selectedChannelIds.length === 0) return [];
+
+    const timestampMap = new Map<string, Record<string, any>>();
+
+    selectedChannelIds.forEach((channelId) => {
+      const readings = channelDataMap[channelId] || [];
+      readings.forEach((r) => {
+        const rawTs = r.start;
+        if (!timestampMap.has(rawTs)) {
+          timestampMap.set(rawTs, {
+            rawTimestamp: rawTs,
+            time: new Date(rawTs).toLocaleString([], {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          });
+        }
+
+        const entry = timestampMap.get(rawTs)!;
+        entry[channelId] = r.average_value !== null ? parseFloat(r.average_value.toFixed(2)) : null;
+        entry[`${channelId}_min`] = r.minimum_value !== null ? parseFloat(r.minimum_value.toFixed(2)) : null;
+        entry[`${channelId}_max`] = r.maximum_value !== null ? parseFloat(r.maximum_value.toFixed(2)) : null;
+        entry[`${channelId}_count`] = r.reading_count;
+      });
+    });
+
+    return Array.from(timestampMap.values()).sort(
+      (a, b) => new Date(a.rawTimestamp).getTime() - new Date(b.rawTimestamp).getTime()
+    );
+  }, [selectedChannelIds, channelDataMap]);
+
+  /*
+   * Handle single channel toggle
+   */
+  const handleToggleChannel = (channelId: string) => {
+    setSelectedChannelIds((prev) => {
+      if (prev.includes(channelId)) {
+        return prev.filter((id) => id !== channelId);
+      }
+      return [...prev, channelId];
+    });
+  };
+
+  /*
+   * Handle batch selection/deselection
+   */
+  const handleSelectChannels = (channelIds: string[], select: boolean) => {
+    setSelectedChannelIds((prev) => {
+      const set = new Set(prev);
+      channelIds.forEach((id) => {
+        if (select) {
+          set.add(id);
+        } else {
+          set.delete(id);
+        }
+      });
+      return Array.from(set);
+    });
+  };
+
+  /*
+   * Clear all selected channels
+   */
+  const handleClearAll = () => {
+    setSelectedChannelIds([]);
+  };
+
+  /*
+   * Apply date range
    */
   const handleApplyRange = () => {
     if (!startDate || !endDate) {
       setError('Please select both start and end dates.');
       return;
     }
-
     if (startDate > endDate) {
       setError('Start date cannot be later than end date.');
       return;
     }
-
     setError('');
-
-    setAppliedRange({
-      start: startDate,
-      end: endDate,
-    });
+    setAppliedRange({ start: startDate, end: endDate });
   };
 
   /*
@@ -149,528 +385,486 @@ export const TelemetryPage: React.FC = () => {
   const handleResetRange = () => {
     const defaultStart = '2020-05-15';
     const defaultEnd = '2020-06-18';
-
     setStartDate(defaultStart);
     setEndDate(defaultEnd);
-
-    setAppliedRange({
-      start: defaultStart,
-      end: defaultEnd,
-    });
-
+    setAppliedRange({ start: defaultStart, end: defaultEnd });
     setError('');
   };
 
   /*
-   * Convert API data into chart-friendly data
+   * CSV EXPORT FUNCTIONALITY (Step 7 Requirement)
+   * Builds timestamp-aligned CSV file and triggers browser download.
    */
-  const chartPoints = aggregateData.map((d) => ({
-    time: new Date(d.start).toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
+  const handleExportCSV = () => {
+    if (alignedChartPoints.length === 0 || selectedChannelsInfo.length === 0) {
+      alert('No telemetry data available to export.');
+      return;
+    }
 
-    avg:
-      d.average_value !== null
-        ? parseFloat(d.average_value.toFixed(2))
-        : null,
+    // Build CSV Headers: Timestamp, Inverter 01 — AC Power (kW), Inverter 01 — DC Power (kW)...
+    const headers = [
+      'Timestamp',
+      ...selectedChannelsInfo.map((info) => `"${info.displayName} (${info.unit})"`),
+    ];
 
-    min:
-      d.minimum_value !== null
-        ? parseFloat(d.minimum_value.toFixed(2))
-        : null,
+    const rows = alignedChartPoints.map((pt) => {
+      const tsFormatted = `"${pt.rawTimestamp}"`;
+      const values = selectedChannelsInfo.map((info) => {
+        const val = pt[info.id];
+        return val !== undefined && val !== null ? val : '';
+      });
+      return [tsFormatted, ...values].join(',');
+    });
 
-    max:
-      d.maximum_value !== null
-        ? parseFloat(d.maximum_value.toFixed(2))
-        : null,
-  }));
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute(
+      'download',
+      `PlantIQ_Telemetry_${appliedRange.start}_to_${appliedRange.end}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
-  /*
-   * Currently selected channel
-   */
-  const selectedChannel = channels.find(
-    (channel) => channel.id === selectedChannelId
-  );
+  // Determine Y-Axis Label
+  const yAxisLabel = useMemo(() => {
+    if (selectedChannelsInfo.length === 0) return 'Value';
+    const units = new Set(selectedChannelsInfo.map((i) => i.unit));
+    if (units.size === 1) {
+      const unit = Array.from(units)[0];
+      return unit === 'kW' ? 'Power (kW)' : unit === 'kWh' ? 'Energy (kWh)' : `Value (${unit})`;
+    }
+    return 'Value';
+  }, [selectedChannelsInfo]);
+
+  // Determine active channel for table view
+  const primaryTableChannel = useMemo(() => {
+    if (activeTableChannelId && selectedChannelIds.includes(activeTableChannelId)) {
+      return selectedChannelsInfo.find((i) => i.id === activeTableChannelId) || selectedChannelsInfo[0];
+    }
+    return selectedChannelsInfo[0] || null;
+  }, [activeTableChannelId, selectedChannelIds, selectedChannelsInfo]);
+
+  const activeTableReadings = useMemo(() => {
+    if (!primaryTableChannel) return [];
+    return channelDataMap[primaryTableChannel.id] || [];
+  }, [primaryTableChannel, channelDataMap]);
 
   return (
-    <div className="space-y-4 pb-12">
-
+    <div className="space-y-4 pb-12 font-mono">
       {/* ========================================================= */}
-      {/* HEADER */}
+      {/* HEADER TOOLBAR */}
       {/* ========================================================= */}
-
       <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs">
-
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-
-          {/* Title */}
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Telemetry Analytics
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight font-sans">
+                Telemetry Analytics Explorer
               </h1>
-
-              <Badge variant={channels.length > 0 ? 'blue' : 'slate'}>
-                {channels.length > 0
-                  ? 'SCADA TIME-SERIES'
-                  : 'NO CHANNELS'}
+              <Badge variant={selectedChannelIds.length > 0 ? 'emerald' : 'slate'}>
+                {selectedChannelIds.length > 0 ? `${selectedChannelIds.length} ACTIVE CHANNELS` : 'NO SELECTION'}
               </Badge>
             </div>
-
             <p className="text-xs text-slate-500 font-mono mt-0.5">
-              Query time-bucketed telemetry readings across{' '}
-              {channels.length} channels
+              Multi-channel time series telemetry curves with timestamp alignment
             </p>
           </div>
 
-          {/* Controls */}
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
-
-            {/* Channel */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
-
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 ml-1" />
-
-              <select
-                value={selectedChannelId}
-                onChange={(e) =>
-                  setSelectedChannelId(e.target.value)
-                }
-                disabled={channels.length === 0}
-                className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer disabled:opacity-50 max-w-[240px]"
-              >
-                {channels.length > 0 ? (
-                  channels.map((channel) => (
-                    <option
-                      key={channel.id}
-                      value={channel.id}
-                    >
-                      {channel.canonical_key} ({channel.source_name})
-                    </option>
-                  ))
-                ) : (
-                  <option value="">
-                    No channels available
-                  </option>
-                )}
-              </select>
-            </div>
-
-            {/* Interval */}
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+            {/* Resolution Selector */}
             <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
-
-              {(['5min', 'hour', 'day', 'week'] as const).map(
-                (inv) => (
-                  <button
-                    key={inv}
-                    onClick={() => setInterval(inv)}
-                    disabled={channels.length === 0}
-                    className={`px-2.5 py-1 rounded text-xs uppercase transition ${interval === inv
-                        ? 'bg-[#004874] text-white font-bold'
-                        : 'text-slate-600 hover:text-slate-900'
-                      } disabled:opacity-50`}
-                  >
-                    {inv}
-                  </button>
-                )
-              )}
+              {(['5min', '15min', 'hour', 'day', 'week'] as const).map((inv) => (
+                <button
+                  key={inv}
+                  onClick={() => setInterval(inv)}
+                  className={`px-2.5 py-1 rounded text-xs uppercase transition ${
+                    interval === inv
+                      ? 'bg-[#004874] text-white font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {inv}
+                </button>
+              ))}
             </div>
+
+            {/* CSV Export Button */}
+            <button
+              onClick={handleExportCSV}
+              disabled={alignedChartPoints.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>EXPORT CSV</span>
+            </button>
           </div>
         </div>
 
-        {/* ======================================================= */}
-        {/* DATE RANGE */}
-        {/* ======================================================= */}
-
+        {/* Date Range Section */}
         <div className="mt-4 pt-4 border-t border-slate-100">
-
           <div className="flex flex-col lg:flex-row lg:items-end gap-3">
-
-            {/* Start Date */}
-            <div className="flex-1 min-w-[180px]">
-
-              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">
+            <div className="flex-1 min-w-[160px]">
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
                 Start Date
               </label>
-
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-
-                <CalendarDays className="w-4 h-4 text-slate-400" />
-
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) =>
-                    setStartDate(e.target.value)
-                  }
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="w-full bg-transparent text-xs font-mono text-slate-700 focus:outline-none"
                 />
-
               </div>
             </div>
 
-            {/* End Date */}
-            <div className="flex-1 min-w-[180px]">
-
-              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">
+            <div className="flex-1 min-w-[160px]">
+              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">
                 End Date
               </label>
-
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-
-                <CalendarDays className="w-4 h-4 text-slate-400" />
-
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) =>
-                    setEndDate(e.target.value)
-                  }
+                  onChange={(e) => setEndDate(e.target.value)}
                   className="w-full bg-transparent text-xs font-mono text-slate-700 focus:outline-none"
                 />
-
               </div>
             </div>
 
-            {/* Apply */}
             <button
               onClick={handleApplyRange}
-              disabled={loading || channels.length === 0}
-              className="px-4 py-2 rounded-lg bg-[#004874] text-white text-xs font-mono font-bold hover:bg-[#003b60] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading}
+              className="px-4 py-2 rounded-lg bg-[#004874] text-white text-xs font-mono font-bold hover:bg-[#003b60] transition disabled:opacity-50"
             >
               {loading ? 'LOADING...' : 'APPLY RANGE'}
             </button>
 
-            {/* Reset */}
             <button
               onClick={handleResetRange}
-              disabled={loading || channels.length === 0}
-              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-mono font-bold hover:bg-slate-50 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              disabled={loading}
+              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-600 text-xs font-mono font-bold hover:bg-slate-50 transition flex items-center gap-1.5"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               RESET
             </button>
-
           </div>
-
-          {/* Current query */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-400">
-
-            <span>
-              QUERY:
-            </span>
-
-            <span className="text-slate-600">
-              {appliedRange.start} 00:00:00Z
-            </span>
-
-            <span>
-              →
-            </span>
-
-            <span className="text-slate-600">
-              {appliedRange.end} 23:59:59Z
-            </span>
-
-            {selectedChannel && (
-              <>
-                <span>•</span>
-
-                <span className="text-slate-600">
-                  {selectedChannel.canonical_key}
-                </span>
-
-                <span>•</span>
-
-                <span className="text-slate-600 uppercase">
-                  {interval}
-                </span>
-              </>
-            )}
-
-          </div>
-
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* ERROR */}
-      {/* ========================================================= */}
-
+      {/* ERROR BANNER */}
       {error && (
         <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 flex items-start gap-3">
-
           <AlertCircle className="w-4 h-4 text-rose-600 mt-0.5 shrink-0" />
-
           <div>
-            <p className="text-xs font-mono font-bold text-rose-700">
-              TELEMETRY QUERY ERROR
-            </p>
-
-            <p className="text-xs font-mono text-rose-600 mt-0.5">
-              {error}
-            </p>
+            <p className="text-xs font-mono font-bold text-rose-700">TELEMETRY QUERY ERROR</p>
+            <p className="text-xs font-mono text-rose-600 mt-0.5">{error}</p>
           </div>
-
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* CHART */}
+      {/* MAIN WORKSPACE GRID: ASSET TREE + CHART/TABLE */}
       {/* ========================================================= */}
-
-      <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
-
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-
-          <h3 className="text-xs font-mono font-bold uppercase text-slate-700 tracking-wider">
-            Aggregated Telemetry Curve ({interval} buckets)
-          </h3>
-
-          <span className="text-xs font-mono text-slate-400">
-            {chartPoints.length} Data Points
-          </span>
-
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* LEFT COLUMN: ASSET TREE */}
+        <div className="lg:col-span-4 xl:col-span-3">
+          <AssetTree
+            plants={plants}
+            assets={assets}
+            channels={channels}
+            selectedChannelIds={selectedChannelIds}
+            onToggleChannel={handleToggleChannel}
+            onSelectChannels={handleSelectChannels}
+            loading={initialLoading}
+            error={null}
+          />
         </div>
 
-        <div className="h-72 w-full relative">
+        {/* RIGHT COLUMN: MULTI-CHANNEL CHART & TABLE */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-4">
+          {/* Selected Channel Tags Bar */}
+          <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-sky-600" />
+                Selected Telemetry Series ({selectedChannelsInfo.length})
+              </span>
+              {selectedChannelsInfo.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Clear All
+                </button>
+              )}
+            </div>
 
-          {loading ? (
-
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-50/60 rounded-lg">
-
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
-
-                <Activity className="w-4 h-4 animate-spin text-sky-600" />
-
-                Querying Telemetry Readings...
-
+            {selectedChannelsInfo.length === 0 ? (
+              <div className="text-xs text-slate-400 italic py-1">
+                No channels selected. Expand the Asset Hierarchy on the left to select signals.
               </div>
-
-            </div>
-
-          ) : chartPoints.length === 0 ? (
-
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-mono">
-
-              <Activity className="w-6 h-6 mb-2 text-slate-300" />
-
-              <span>
-                No telemetry data available
-              </span>
-
-              <span className="text-[10px] mt-1 text-slate-300">
-                Try another date range or channel
-              </span>
-
-            </div>
-
-          ) : (
-
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-
-              <LineChart
-                data={chartPoints}
-                margin={{
-                  top: 10,
-                  right: 10,
-                  left: -10,
-                  bottom: 0,
-                }}
-              >
-
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f1f5f9"
-                  vertical={false}
-                />
-
-                <XAxis
-                  dataKey="time"
-                  stroke="#94a3b8"
-                  fontSize={10}
-                  tickLine={false}
-                />
-
-                <YAxis
-                  stroke="#94a3b8"
-                  fontSize={10}
-                  tickLine={false}
-                />
-
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#004874',
-                    borderColor: '#0284c7',
-                    borderRadius: '8px',
-                    color: '#ffffff',
-                    fontSize: '11px',
-                    fontFamily: 'monospace',
-                  }}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="avg"
-                  stroke="#0284c7"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Average Value"
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="max"
-                  stroke="#10b981"
-                  strokeWidth={1}
-                  strokeDasharray="2 2"
-                  dot={false}
-                  name="Max Value"
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="min"
-                  stroke="#ef4444"
-                  strokeWidth={1}
-                  strokeDasharray="2 2"
-                  dot={false}
-                  name="Min Value"
-                />
-
-              </LineChart>
-
-            </ResponsiveContainer>
-
-          )}
-
-        </div>
-      </div>
-
-      {/* ========================================================= */}
-      {/* TABLE */}
-      {/* ========================================================= */}
-
-      <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
-
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-
-          <div className="flex items-center gap-2">
-
-            <TableIcon className="w-4 h-4 text-slate-500" />
-
-            <h3 className="text-xs font-mono font-bold uppercase text-slate-700 tracking-wider">
-              Aggregated Telemetry Bucket Table
-            </h3>
-
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedChannelsInfo.map((info) => (
+                  <div
+                    key={info.id}
+                    className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg text-xs"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: info.color }}
+                    />
+                    <span className="font-semibold text-slate-800">{info.displayName}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">({info.unit})</span>
+                    <button
+                      onClick={() => handleToggleChannel(info.id)}
+                      className="text-slate-400 hover:text-rose-600 ml-1"
+                      title="Remove series"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          <span className="text-[10px] font-mono text-slate-400">
-            Showing first {Math.min(10, aggregateData.length)} records
-          </span>
+          {/* MULTI-CHANNEL CHART CARD */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
+            <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-mono font-bold uppercase text-slate-800 tracking-wider flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-sky-600" />
+                  <span>
+                    {selectedChannelsInfo.length > 0
+                      ? `Multi-Channel Curve Explorer (${selectedChannelsInfo.length} Series)`
+                      : 'Telemetry Explorer'}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                  Synchronized aggregate curves grouped by exact timestamp
+                </p>
+              </div>
 
-        </div>
-
-        <div className="overflow-x-auto">
-
-          {aggregateData.length === 0 ? (
-
-            <div className="p-6 text-center text-xs text-slate-400 font-mono">
-
-              No bucketed readings available for selected channel and date range
-
+              <span className="text-xs font-mono text-slate-500 font-semibold">
+                {alignedChartPoints.length} Timestamps
+              </span>
             </div>
 
-          ) : (
+            <div className="h-80 w-full relative pt-2">
+              {loading ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-slate-50/70 rounded-lg z-10">
+                  <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
+                    <Activity className="w-5 h-5 animate-spin text-sky-600" />
+                    Querying Telemetry Readings...
+                  </div>
+                </div>
+              ) : selectedChannelIds.length === 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-mono">
+                  <SlidersHorizontal className="w-8 h-8 mb-2 text-slate-300" />
+                  <strong className="text-slate-600 font-bold text-sm">No Channel Selected</strong>
+                  <span>Select one or more channels from the Asset Tree to explore telemetry.</span>
+                </div>
+              ) : alignedChartPoints.length === 0 ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-400 font-mono">
+                  <Activity className="w-8 h-8 mb-2 text-slate-300" />
+                  <strong className="text-slate-600 font-bold text-sm">No Telemetry Data Available</strong>
+                  <span>No telemetry readings available for the selected channels and date range.</span>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={alignedChartPoints}
+                    margin={{
+                      top: 10,
+                      right: 15,
+                      left: 15,
+                      bottom: 25,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis
+                      dataKey="time"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      tickLine={false}
+                      label={{
+                        value: 'Time',
+                        position: 'insideBottom',
+                        offset: -15,
+                        fontSize: 10,
+                        fill: '#64748b',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                    <YAxis
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      tickLine={false}
+                      label={{
+                        value: yAxisLabel,
+                        angle: -90,
+                        position: 'insideLeft',
+                        offset: 0,
+                        fontSize: 10,
+                        fill: '#64748b',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const pt = payload[0].payload;
+                        return (
+                          <div className="bg-[#004874] border border-[#0284c7] text-white p-3 rounded-xl shadow-xl text-xs font-mono space-y-1.5 min-w-[220px]">
+                            <div className="font-bold border-b border-sky-600/60 pb-1 text-sky-200">
+                              {pt.time}
+                            </div>
+                            <div className="space-y-1">
+                              {selectedChannelsInfo.map((info) => {
+                                const val = pt[info.id];
+                                if (val === undefined || val === null) return null;
+                                return (
+                                  <div
+                                    key={info.id}
+                                    className="flex items-center justify-between gap-3 text-[11px]"
+                                  >
+                                    <span className="flex items-center gap-1.5 truncate">
+                                      <span
+                                        className="w-2 h-2 rounded-full shrink-0"
+                                        style={{ backgroundColor: info.color }}
+                                      />
+                                      <span className="truncate">{info.displayName}</span>
+                                    </span>
+                                    <span className="font-bold text-emerald-300 whitespace-nowrap">
+                                      {val.toLocaleString()} {info.unit}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Legend
+                      verticalAlign="top"
+                      height={36}
+                      formatter={(value, entry) => (
+                        <span className="text-xs font-mono text-slate-700 font-semibold mr-3">
+                          {value}
+                        </span>
+                      )}
+                    />
+                    {selectedChannelsInfo.map((info) => (
+                      <Line
+                        key={info.id}
+                        type="monotone"
+                        dataKey={info.id}
+                        name={info.displayName}
+                        stroke={info.color}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 5 }}
+                        connectNulls={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
 
-            <table className="w-full text-left text-xs font-mono">
+          {/* TELEMETRY READINGS TABLE */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <TableIcon className="w-4 h-4 text-slate-500" />
+                <h3 className="text-xs font-mono font-bold uppercase text-slate-700 tracking-wider">
+                  Readings Table — {primaryTableChannel?.displayName || 'Primary Channel'}
+                </h3>
+              </div>
 
-              <thead>
+              {selectedChannelsInfo.length > 1 && (
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-[10px] text-slate-400">View Channel:</span>
+                  <select
+                    value={primaryTableChannel?.id || ''}
+                    onChange={(e) => setActiveTableChannelId(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-700"
+                  >
+                    {selectedChannelsInfo.map((info) => (
+                      <option key={info.id} value={info.id}>
+                        {info.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
-                <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase text-slate-500 font-semibold">
-
-                  <th className="py-2 px-3">
-                    TIMESTAMP BUCKET
-                  </th>
-
-                  <th className="py-2 px-3">
-                    READINGS COUNT
-                  </th>
-
-                  <th className="py-2 px-3">
-                    AVERAGE VALUE
-                  </th>
-
-                  <th className="py-2 px-3">
-                    MIN VALUE
-                  </th>
-
-                  <th className="py-2 px-3">
-                    MAX VALUE
-                  </th>
-
-                </tr>
-
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-
-                {aggregateData
-                  .slice(0, 10)
-                  .map((row, idx) => (
-
-                    <tr
-                      key={`${row.start}-${idx}`}
-                      className="hover:bg-slate-50"
-                    >
-
-                      <td className="py-2 px-3 font-semibold text-slate-800">
-                        {new Date(
-                          row.start
-                        ).toLocaleString()}
-                      </td>
-
-                      <td className="py-2 px-3 text-slate-600">
-                        {row.reading_count}
-                      </td>
-
-                      <td className="py-2 px-3 text-sky-700 font-bold">
-                        {row.average_value !== null
-                          ? row.average_value.toFixed(2)
-                          : 'N/A'}
-                      </td>
-
-                      <td className="py-2 px-3 text-emerald-700">
-                        {row.minimum_value !== null
-                          ? row.minimum_value.toFixed(2)
-                          : 'N/A'}
-                      </td>
-
-                      <td className="py-2 px-3 text-rose-700">
-                        {row.maximum_value !== null
-                          ? row.maximum_value.toFixed(2)
-                          : 'N/A'}
-                      </td>
-
+            <div className="overflow-x-auto">
+              {activeTableReadings.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-400 font-mono">
+                  No readings available for selected channel and date range
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase text-slate-500 font-semibold">
+                      <th className="py-2 px-3">TIME</th>
+                      <th className="py-2 px-3">READINGS</th>
+                      <th className="py-2 px-3">
+                        AVERAGE {primaryTableChannel?.metricName.toUpperCase()}
+                      </th>
+                      <th className="py-2 px-3">
+                        LOWEST {primaryTableChannel?.metricName.toUpperCase()}
+                      </th>
+                      <th className="py-2 px-3">
+                        HIGHEST {primaryTableChannel?.metricName.toUpperCase()}
+                      </th>
                     </tr>
-
-                  ))}
-
-              </tbody>
-
-            </table>
-
-          )}
-
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activeTableReadings.slice(0, 15).map((row, idx) => (
+                      <tr key={`${row.start}-${idx}`} className="hover:bg-slate-50">
+                        <td className="py-2 px-3 font-semibold text-slate-800">
+                          {new Date(row.start).toLocaleString()}
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">{row.reading_count}</td>
+                        <td className="py-2 px-3 text-sky-700 font-bold">
+                          {row.average_value !== null
+                            ? `${row.average_value.toFixed(2)} ${primaryTableChannel?.unit}`
+                            : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 text-emerald-700">
+                          {row.minimum_value !== null
+                            ? `${row.minimum_value.toFixed(2)} ${primaryTableChannel?.unit}`
+                            : 'N/A'}
+                        </td>
+                        <td className="py-2 px-3 text-rose-700">
+                          {row.maximum_value !== null
+                            ? `${row.maximum_value.toFixed(2)} ${primaryTableChannel?.unit}`
+                            : 'N/A'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       </div>
-
     </div>
   );
 };

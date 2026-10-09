@@ -169,3 +169,126 @@ def delete_detector(
     db.delete(detector)
     db.commit()
     return None
+
+
+@router.post(
+    "/{detector_id}/run",
+    status_code=status.HTTP_200_OK,
+)
+def run_detector(
+    detector_id: UUID,
+    window_hours: int = Query(default=24, ge=1, le=168),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "engineer")),
+):
+    """Execute on-demand anomaly detection scan for a specific detector."""
+    from datetime import datetime, timedelta, timezone
+    from app.ai.anomaly_dedup import persist_and_deduplicate_anomalies
+    from app.ai.detector_registry import DetectorContext, DetectorRegistry
+    from app.models.entities import Asset, Channel, Reading
+
+    detector = db.get(Detector, detector_id)
+    if detector is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Detector not found",
+        )
+
+    enforce_org_access(current_user, detector.plant.org_id)
+
+    if not DetectorRegistry.has_detector(detector.method):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Method '{detector.method}' is not registered in detector engine",
+        )
+
+    detector_instance = DetectorRegistry.get(detector.method)
+    start_window = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+
+    scope = detector.asset_scope or {}
+    target_asset_type = scope.get("asset_type", "inverter")
+
+    assets_query = select(Asset).where(Asset.plant_id == detector.plant_id)
+    if target_asset_type:
+        assets_query = assets_query.where(Asset.asset_type == target_asset_type)
+    if "asset_ids" in scope and scope["asset_ids"]:
+        assets_query = assets_query.where(Asset.id.in_([UUID(a) for a in scope["asset_ids"]]))
+
+    assets = db.execute(assets_query).scalars().all()
+
+    total_detected = 0
+    total_created = 0
+    total_merged = 0
+
+    for asset in assets:
+        channel = (
+            db.execute(
+                select(Channel).where(
+                    Channel.asset_id == asset.id,
+                    Channel.canonical_key == detector.canonical_key,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not channel:
+            continue
+
+        readings = (
+            db.execute(
+                select(Reading)
+                .where(
+                    Reading.channel_id == channel.id,
+                    Reading.ts >= start_window,
+                )
+                .order_by(Reading.ts.asc())
+            )
+            .scalars()
+            .all()
+        )
+        if len(readings) < 4:
+            continue
+
+        observations = [(r.ts, float(r.value)) for r in readings]
+        context = DetectorContext(
+            plant_id=detector.plant_id,
+            asset_id=asset.id,
+            channel_id=channel.id,
+            canonical_key=detector.canonical_key,
+            plant_name=detector.plant.name,
+            asset_name=asset.name,
+            asset_type=asset.asset_type,
+            rated_kw=asset.rated_kw,
+            capacity_dc_kwp=detector.plant.capacity_dc_kwp,
+            expected_pr=detector.plant.expected_pr or 0.80,
+            tariff_inr_per_kwh=detector.plant.tariff_inr_per_kwh,
+        )
+
+        candidates = detector_instance.detect(
+            observations=observations,
+            parameters=detector.parameters or {},
+            context=context,
+        )
+
+        if candidates:
+            _, created, merged = persist_and_deduplicate_anomalies(
+                db=db,
+                candidates=candidates,
+                context=context,
+                detector_id=detector.id,
+            )
+            total_detected += len(candidates)
+            total_created += created
+            total_merged += merged
+
+    return {
+        "detector_id": str(detector_id),
+        "detector_name": detector.name,
+        "method": detector.method,
+        "status": "success",
+        "assets_scanned": len(assets),
+        "anomalies_detected": total_detected,
+        "anomalies_created": total_created,
+        "anomalies_merged": total_merged,
+    }
+

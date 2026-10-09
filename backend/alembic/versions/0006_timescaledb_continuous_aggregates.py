@@ -17,7 +17,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "0006"
-down_revision: Union[str, None] = "0005"
+down_revision: Union[str, None] = "0005_events"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -40,7 +40,7 @@ def upgrade() -> None:
         return
 
     # Ensure readings table is a hypertable
-    bind.execute(sa.text("SELECT create_hypertable('readings', 'ts', if_not_exists => TRUE);"))
+    bind.execute(sa.text("SELECT create_hypertable('readings', 'ts', if_not_exists => TRUE, migrate_data => TRUE);"))
 
     # 1. 5-minute continuous aggregate
     bind.execute(sa.text("""

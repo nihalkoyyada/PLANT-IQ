@@ -249,7 +249,8 @@ class FileProfiler:
             if ext in (".parquet", ".pq"):
                 return pl.read_parquet(path)
             if ext in (".xlsx", ".xls"):
-                return pl.read_excel(path)
+                res = pl.read_excel(path)
+                return pl.DataFrame(res)
             raise UnsupportedFileFormatError(f"Unsupported extension: {ext}")
         except EmptyFileError:
             raise
@@ -261,7 +262,7 @@ class FileProfiler:
                         "SELECT * FROM read_csv_auto(?, ignore_errors=true)", [str(path)]
                     )
                     arrow_table = rel.arrow()
-                    return pl.from_arrow(arrow_table)  # type: ignore[return-value]
+                    return pl.DataFrame(arrow_table)  # type: ignore[return-value]
                 except Exception as duck_err:
                     raise ProfilerError(
                         f"Failed to read CSV '{path.name}': {e} (DuckDB fallback: {duck_err})"

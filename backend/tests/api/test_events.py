@@ -83,6 +83,7 @@ def test_setup():
             "viewer_headers": {"Authorization": f"Bearer {viewer_token}"},
         }
     finally:
+        db.rollback()
         db.close()
 
 
@@ -137,8 +138,15 @@ def test_get_events_filtering(client, test_setup):
     headers = test_setup["admin_headers"]
     plant_id = str(test_setup["plant"].id)
 
+    db = SessionLocal()
+    try:
+        db.query(Event).filter(Event.plant_id == test_setup["plant"].id).delete()
+        db.commit()
+    finally:
+        db.close()
+
     # Post two events with distinct severities
-    client.post("/events", json={
+    r_post1 = client.post("/events", json={
         "plant_id": plant_id,
         "source": "grid",
         "event_type": "outage",
@@ -146,8 +154,9 @@ def test_get_events_filtering(client, test_setup):
         "start_time": "2026-10-01T10:00:00Z",
         "message": "Grid frequency drop",
     }, headers=headers)
+    assert r_post1.status_code == 201
 
-    client.post("/events", json={
+    r_post2 = client.post("/events", json={
         "plant_id": plant_id,
         "source": "weather",
         "event_type": "soiling",
@@ -155,6 +164,7 @@ def test_get_events_filtering(client, test_setup):
         "start_time": "2026-10-02T12:00:00Z",
         "message": "High Dust Alert",
     }, headers=headers)
+    assert r_post2.status_code == 201
 
     # Filter by severity=critical
     res1 = client.get(f"/events?plant_id={plant_id}&severity=critical", headers=headers)
@@ -205,3 +215,129 @@ invalid_uuid,scada,info,2026-10-04T11:00:00Z,Message with bad plant UUID
     assert summary["failed_rows"] == 3
     assert summary["imported_rows"] == 0
     assert len(summary["validation_errors"]) == 3
+
+
+def test_import_events_csv_exact_user_spec(client, test_setup):
+    """Test exact user test CSV with severity=medium, event_type=performance_warning, source=SCADA."""
+    headers = test_setup["admin_headers"]
+    plant_id = str(test_setup["plant"].id)
+
+    csv_content = f"""plant_id,start_time,message,event_type,severity,source,code
+{plant_id},2020-06-17T12:00:00Z,Inverter performance warning detected,performance_warning,medium,SCADA,INV_TEST_001
+"""
+    files = {"file": ("test_user.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+    response = client.post(
+        f"/events/import-csv?default_plant_id={plant_id}",
+        files=files,
+        headers=headers
+    )
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_rows"] == 1
+    assert summary["imported_rows"] == 1
+    assert summary["failed_rows"] == 0
+    assert len(summary["validation_errors"]) == 0
+
+
+def test_import_events_csv_invalid_plant_id(client, test_setup):
+    """Test importing CSV with non-existent plant_id UUID returns validation error, not HTTP 500."""
+    headers = test_setup["admin_headers"]
+    random_uuid = str(uuid4())
+
+    csv_content = f"""plant_id,start_time,message,severity
+{random_uuid},2026-10-05T12:00:00Z,Non-existent plant test,info
+"""
+    files = {"file": ("bad_plant.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+    response = client.post("/events/import-csv", files=files, headers=headers)
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_rows"] == 1
+    assert summary["failed_rows"] == 1
+    assert summary["imported_rows"] == 0
+    assert "not found" in summary["validation_errors"][0]["error"].lower()
+
+
+def test_import_events_csv_invalid_severity(client, test_setup):
+    """Test invalid severity string produces validation error."""
+    headers = test_setup["admin_headers"]
+    plant_id = str(test_setup["plant"].id)
+
+    csv_content = f"""plant_id,start_time,message,severity
+{plant_id},2026-10-05T12:00:00Z,Invalid severity test,super_critical_catastrophic
+"""
+    files = {"file": ("bad_severity.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+    response = client.post("/events/import-csv", files=files, headers=headers)
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_rows"] == 1
+    assert summary["failed_rows"] == 1
+    assert summary["imported_rows"] == 0
+    assert "invalid severity" in summary["validation_errors"][0]["error"].lower()
+
+
+def test_import_events_csv_org_isolation(client, test_setup):
+    """Test that a user cannot import events into another organization's plant."""
+    db = SessionLocal()
+    try:
+        # Create another org & plant
+        other_org = Organization(name="Other Org Events")
+        db.add(other_org)
+        db.commit()
+        db.refresh(other_org)
+
+        other_plant = Plant(
+            org_id=other_org.id,
+            name="Other Plant",
+            plant_type="solar",
+            capacity_ac_kw=1000.0,
+            capacity_dc_kwp=1200.0,
+        )
+        db.add(other_plant)
+        db.commit()
+        db.refresh(other_plant)
+        other_plant_id = str(other_plant.id)
+
+        headers = test_setup["admin_headers"]
+
+        # 1. Row has other_plant_id -> should fail with validation error
+        csv_content = f"""plant_id,start_time,message,severity
+{other_plant_id},2026-10-05T12:00:00Z,Cross org event attempt,medium
+"""
+        files = {"file": ("cross_org.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+        response = client.post("/events/import-csv", files=files, headers=headers)
+        assert response.status_code == 200
+        summary = response.json()
+        assert summary["failed_rows"] == 1
+        assert "different organization" in summary["validation_errors"][0]["error"].lower()
+
+        # 2. default_plant_id in form data is other_plant_id -> should fail with HTTP 403 or 404
+        files2 = {"file": ("cross_org.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+        resp2 = client.post(
+            "/events/import-csv",
+            data={"default_plant_id": other_plant_id},
+            files=files2,
+            headers=headers
+        )
+        assert resp2.status_code in (403, 404)
+    finally:
+        db.close()
+
+
+def test_import_events_csv_mixed_valid_invalid(client, test_setup):
+    """Test importing CSV with a mix of valid and invalid rows performs partial import."""
+    headers = test_setup["admin_headers"]
+    plant_id = str(test_setup["plant"].id)
+
+    csv_content = f"""plant_id,start_time,message,severity,source
+{plant_id},2026-10-06T10:00:00Z,Valid Event 1,medium,SCADA
+{plant_id},INVALID_TIME,Invalid Event,medium,SCADA
+{plant_id},2026-10-06T11:00:00Z,Valid Event 2,high,inverter
+"""
+    files = {"file": ("mixed.csv", io.BytesIO(csv_content.encode("utf-8")), "text/csv")}
+    response = client.post("/events/import-csv", files=files, headers=headers)
+    assert response.status_code == 200
+    summary = response.json()
+    assert summary["total_rows"] == 3
+    assert summary["imported_rows"] == 2
+    assert summary["failed_rows"] == 1
+    assert len(summary["validation_errors"]) == 1

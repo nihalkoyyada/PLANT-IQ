@@ -181,6 +181,16 @@ async def import_events_csv(
             detail="Uploaded file must be a CSV file",
         )
 
+    # Validate default_plant_id if provided
+    if default_plant_id is not None:
+        default_plant = db.get(Plant, default_plant_id)
+        if default_plant is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Default plant ID {default_plant_id} not found",
+            )
+        enforce_org_access(current_user, default_plant.org_id)
+
     content_bytes = await file.read()
     try:
         content_text = content_bytes.decode("utf-8-sig")
@@ -219,6 +229,8 @@ async def import_events_csv(
 
     # Pre-cache plant org validation to avoid repeated DB lookups
     validated_plants: dict[UUID, bool] = {}
+    valid_severities = {"info", "warning", "medium", "low", "high", "critical", "error"}
+    valid_sources = {"scada", "manual", "system", "inverter", "grid", "weather", "detector"}
 
     for row_idx, raw_row in enumerate(reader, start=2):
         total_rows += 1
@@ -289,7 +301,16 @@ async def import_events_csv(
             except ValueError as e:
                 row_errors.append(f"End time error: {e}")
 
-        # 5. Resolve message
+        # 5. Resolve severity & source
+        severity_val = row.get("severity", "info").lower()
+        if severity_val not in valid_severities:
+            row_errors.append(f"Invalid severity: '{severity_val}'")
+
+        source_val = row.get("source", "scada").lower()
+        if source_val not in valid_sources:
+            row_errors.append(f"Invalid source: '{source_val}'")
+
+        # 6. Resolve message
         message = row.get("message") or row.get("description")
         if not message:
             row_errors.append("Missing required message or description")
@@ -326,9 +347,9 @@ async def import_events_csv(
         event = Event(
             plant_id=row_plant_id,
             asset_id=row_asset_id,
-            source=row.get("source", "scada").lower(),
+            source=source_val,
             event_type=row.get("event_type", "fault").lower(),
-            severity=row.get("severity", "info").lower(),
+            severity=severity_val,
             start_time=start_dt,
             end_time=end_dt,
             code=row.get("code"),
@@ -339,8 +360,26 @@ async def import_events_csv(
         imported_rows += 1
 
     if events_to_create:
-        db.add_all(events_to_create)
-        db.commit()
+        try:
+            db.add_all(events_to_create)
+            db.commit()
+        except Exception as err:
+            db.rollback()
+            # If batch commit fails, try inserting item by item to save valid ones and capture failed ones
+            imported_rows = 0
+            for item in events_to_create:
+                try:
+                    db.add(item)
+                    db.commit()
+                    imported_rows += 1
+                except Exception as row_err:
+                    db.rollback()
+                    failed_rows += 1
+                    validation_errors.append({
+                        "row": "commit_error",
+                        "error": str(row_err),
+                        "message": item.message,
+                    })
 
     return EventImportSummary(
         total_rows=total_rows,

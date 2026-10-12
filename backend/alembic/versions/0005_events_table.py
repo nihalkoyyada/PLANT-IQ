@@ -122,7 +122,7 @@ def upgrade() -> None:
     op.create_check_constraint(
         "ck_events_severity",
         "events",
-        "severity IN ('info', 'warning', 'critical', 'error')",
+        "severity IN ('info', 'warning', 'medium', 'low', 'high', 'critical', 'error')",
     )
 
 

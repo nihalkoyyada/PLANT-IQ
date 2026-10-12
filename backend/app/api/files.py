@@ -226,7 +226,7 @@ def init_chunked_upload(
     MAX_2GB_BYTES = 2 * 1024 * 1024 * 1024  # 2 GB
     if body.total_size > MAX_2GB_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail="File size exceeds maximum allowed limit of 2GB.",
         )
 
@@ -323,6 +323,11 @@ def upload_file_chunk(
                 buffer.write(chunk_bytes)
 
         if tmp_target.exists():
+            if chunk_target.exists():
+                try:
+                    chunk_target.unlink()
+                except Exception:
+                    pass
             tmp_target.replace(chunk_target)
     except Exception as exc:
         if tmp_target.exists():

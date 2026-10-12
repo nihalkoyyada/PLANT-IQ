@@ -10,7 +10,9 @@ from app.core.security import create_access_token
 client = TestClient(app)
 
 
-def test_reset_scada_admin_success():
+def test_reset_scada_admin_success(monkeypatch):
+    import app.api.dev as dev_module
+    monkeypatch.setattr(dev_module, "MODELS_TO_CLEAR", [])
     db_session = SessionLocal()
     try:
         org = Organization(name=f"Dev Reset Org {uuid4()}")

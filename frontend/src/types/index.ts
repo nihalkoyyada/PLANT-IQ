@@ -258,6 +258,7 @@ export interface PRHeatmapCell {
   has_data: boolean;
   ac_kw: number | null;
   dc_kw: number | null;
+  efficiency?: number | null;
 }
 
 export interface PRHeatmapRow {
@@ -271,29 +272,36 @@ export interface PRHeatmapResponse {
   range: string;
   time_buckets: string[];
   inverters: PRHeatmapRow[];
+  has_poa?: boolean;
 }
 
 export interface TopLosersItem {
   rank: number;
   asset_id: string;
   asset_name: string;
-  expected_mwh: number;
+  expected_mwh?: number | null;
   actual_mwh: number;
-  loss_mwh: number;
-  loss_pct: number;
+  loss_mwh?: number | null;
+  loss_pct?: number | null;
   pr: number | null;
+  efficiency?: number | null;
   has_data: boolean;
 }
 
 export interface LossAnalysisResponse {
   plant_id: string;
   range: string;
-  total_expected_mwh: number;
+  total_expected_mwh?: number | null;
   total_actual_mwh: number;
-  total_loss_mwh: number;
-  total_loss_pct: number;
+  net_shortfall_mwh?: number | null;
+  aggregate_inverter_deficit_mwh?: number | null;
+  total_loss_mwh?: number | null;
+  total_loss_pct?: number | null;
+  net_shortfall_pct?: number | null;
   has_data: boolean;
+  has_poa?: boolean;
   plant_pr?: number | null;
+  ranking_mode?: 'deficit' | 'none' | 'generation' | string;
   losers: TopLosersItem[];
 }
 

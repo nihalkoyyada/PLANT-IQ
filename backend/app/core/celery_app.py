@@ -21,7 +21,10 @@ celery_app = Celery(
     "plantiq",
     broker=broker_url,
     backend=result_backend,
-    include=["app.tasks.kpi_tasks"],
+    include=[
+        "app.tasks.kpi_tasks",
+        "app.tasks.detector_tasks",
+    ],
 )
 
 # Celery Configuration
@@ -38,6 +41,10 @@ celery_app.conf.update(
         "daily-solar-kpi-rollup": {
             "task": "tasks.run_all_plants_daily_kpis",
             "schedule": crontab(hour=1, minute=0),  # Runs daily at 01:00 UTC
+        },
+        "hourly-anomaly-detection-scan": {
+            "task": "tasks.run_scheduled_anomaly_scans",
+            "schedule": crontab(minute=15),  # Runs every hour at :15 minutes
         },
     },
 )

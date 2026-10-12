@@ -137,71 +137,35 @@ WIND_KEYS = [
 
 
 def upgrade() -> None:
-    """Apply migration: add canonical table if needed, seed solar keys, deactivate wind keys."""
-    # Define table reflection for canonical_signals
-    canonical_signals = sa.table(
-        "canonical_signals",
-        sa.column("signal_key", sa.String(64)),
-        sa.column("display_name", sa.String(128)),
-        sa.column("category", sa.String(32)),
-        sa.column("unit", sa.String(32)),
-        sa.column("data_type", sa.String(32)),
-        sa.column("monotonicity", sa.String(32)),
-        sa.column("bound_min_rule", sa.String(128)),
-        sa.column("bound_max_rule", sa.String(128)),
-        sa.column("is_active", sa.Boolean()),
-        sa.column("description", sa.Text()),
-    )
-
-    # 1. Upsert / Insert solar signal definitions
+    """Apply migration: seed solar keys into canonical_signals."""
     for sig in SOLAR_SIGNALS:
-        # Check if row exists, update if exists, insert if missing
+        param = {
+            "key": sig["signal_key"],
+            "name": sig["display_name"],
+            "category": sig["category"],
+            "unit": sig["unit"],
+            "applicable_types": ["solar", "inverter", "weather_station"],
+            "description": sig["description"],
+        }
         stmt = sa.text("""
             INSERT INTO canonical_signals (
-                signal_key, display_name, category, unit, data_type, 
-                monotonicity, bound_min_rule, bound_max_rule, is_active, description
+                key, name, category, unit, applicable_types, description
             ) VALUES (
-                :signal_key, :display_name, :category, :unit, :data_type,
-                :monotonicity, :bound_min_rule, :bound_max_rule, :is_active, :description
+                :key, :name, :category, :unit, :applicable_types, :description
             )
-            ON CONFLICT (signal_key) DO UPDATE SET
-                display_name = EXCLUDED.display_name,
+            ON CONFLICT (key) DO UPDATE SET
+                name = EXCLUDED.name,
                 category = EXCLUDED.category,
                 unit = EXCLUDED.unit,
-                data_type = EXCLUDED.data_type,
-                monotonicity = EXCLUDED.monotonicity,
-                bound_min_rule = EXCLUDED.bound_min_rule,
-                bound_max_rule = EXCLUDED.bound_max_rule,
-                is_active = EXCLUDED.is_active,
+                applicable_types = EXCLUDED.applicable_types,
                 description = EXCLUDED.description;
         """)
-        op.execute(stmt.bindparams(**sig))
-
-    # 2. Deactivate wind-pack keys for Solar MVP
-    for w_key in WIND_KEYS:
-        op.execute(
-            sa.text("""
-                UPDATE canonical_signals 
-                SET is_active = FALSE 
-                WHERE signal_key = :w_key;
-            """).bindparams(w_key=w_key)
-        )
+        op.execute(stmt.bindparams(**param))
 
 
 def downgrade() -> None:
-    """Revert migration: restore wind keys and remove specific solar refinements."""
-    # Re-enable wind keys if needed
-    for w_key in WIND_KEYS:
-        op.execute(
-            sa.text("""
-                UPDATE canonical_signals 
-                SET is_active = TRUE 
-                WHERE signal_key = :w_key;
-            """).bindparams(w_key=w_key)
-        )
-
-    # Remove added specific yield keys if rolling back to 0002
-    op.execute("""
+    """Revert migration: remove specific solar refinements."""
+    op.execute(sa.text("""
         DELETE FROM canonical_signals 
-        WHERE signal_key IN ('energy_ac_daily', 'energy_ac_total', 'irradiance_poa');
-    """)
+        WHERE key IN ('energy_ac_daily', 'energy_ac_total', 'irradiance_poa');
+    """))

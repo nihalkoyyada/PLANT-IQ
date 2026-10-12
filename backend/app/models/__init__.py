@@ -3,6 +3,7 @@
 from app.models.base import Base, TimestampMixin, generate_uuid
 
 from app.models.entities import (
+    Anomaly,
     Asset,
     AuditLog,
     CanonicalSignal,
@@ -29,6 +30,7 @@ __all__ = [
     "Plant",
     "Asset",
     "AuditLog",
+    "Anomaly",
     "CanonicalSignal",
     "Channel",
     "Detector",

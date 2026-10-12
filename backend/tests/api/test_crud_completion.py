@@ -98,7 +98,7 @@ def crud_setup():
             db.add(cs)
             db.commit()
 
-        return {
+        yield {
             "org1": org1,
             "org2": org2,
             "admin": admin_user,
@@ -111,6 +111,7 @@ def crud_setup():
             "suffix": suffix,
         }
     finally:
+        db.rollback()
         db.close()
 
 
@@ -159,12 +160,11 @@ def test_plant_update_org_isolation(client, crud_setup):
 
 def test_plant_delete_conflict_with_assets(client, crud_setup):
     headers = crud_setup["admin_headers"]
-    db = SessionLocal()
     plant_id = crud_setup["plant"].id
-    asset = Asset(plant_id=plant_id, name=f"Inverter Block_{crud_setup['suffix']}", asset_type="inverter")
-    db.add(asset)
-    db.commit()
-    db.close()
+    with SessionLocal() as db:
+        asset = Asset(plant_id=plant_id, name=f"Inverter Block_{crud_setup['suffix']}", asset_type="inverter")
+        db.add(asset)
+        db.commit()
 
     res = client.delete(f"/plants/{plant_id}", headers=headers)
     assert res.status_code == 409

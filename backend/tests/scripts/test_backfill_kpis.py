@@ -115,8 +115,11 @@ def temp_db() -> Generator[str, None, None]:
 
     yield db_uri
     engine.dispose()
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    try:
+        if os.path.exists(db_path):
+            os.remove(db_path)
+    except OSError:
+        pass
 
 
 def test_cli_help() -> None:

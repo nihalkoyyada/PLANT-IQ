@@ -2,30 +2,19 @@
 
 from __future__ import annotations
 
-import os
-from typing import Generator, Optional
+from typing import Optional
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from pathlib import Path
-from dotenv import load_dotenv
-
+from app.core.config import settings
 from app.db.base import Base
-
-BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env")
-
-DEFAULT_DB_URL = "postgresql+psycopg://plantiq:plantiq_dev_password@localhost:5432/plantiq"
 
 
 def get_db_url(db_url: Optional[str] = None) -> str:
-    """Resolve database URL from argument or environment."""
+    """Resolve database URL from argument or environment settings."""
     if db_url:
         return db_url
-    env_url = os.getenv("DATABASE_URL")
-    if env_url:
-        return env_url
-    return DEFAULT_DB_URL
+    return settings.DATABASE_URL
 
 
 def create_db_engine(db_url: Optional[str] = None) -> Engine:
@@ -45,4 +34,3 @@ def get_session_factory(engine: Engine) -> sessionmaker[Session]:
 def init_db(engine: Engine) -> None:
     """Initialize database tables from SQLAlchemy metadata."""
     Base.metadata.create_all(bind=engine)
-

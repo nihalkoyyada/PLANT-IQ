@@ -76,6 +76,7 @@ def test_async_ingestion_job_lifecycle():
         assert resp.status_code == 201, resp.json()
         job_data = resp.json()
         job_id = job_data["id"]
+        db_session.close()
 
         # 5. Run Ingestion Job via POST /ingestion-jobs/{id}/run (Async)
         run_resp = client.post(f"/ingestion-jobs/{job_id}/run", headers=headers)

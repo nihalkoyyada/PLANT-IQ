@@ -51,8 +51,7 @@ def test_login_unknown_user(client):
 
 
 def test_get_me_for_all_roles(client):
-    db_session = SessionLocal()
-    try:
+    with SessionLocal() as db_session:
         for role_name in ["admin", "engineer", "viewer"]:
             user = db_session.query(User).filter(User.role == role_name).first()
             assert user is not None
@@ -62,13 +61,10 @@ def test_get_me_for_all_roles(client):
             assert response.status_code == 200
             data = response.json()
             assert data["role"] == role_name
-    finally:
-        db_session.close()
 
 
 def test_get_me_expired_jwt(client):
-    db_session = SessionLocal()
-    try:
+    with SessionLocal() as db_session:
         user = db_session.query(User).first()
         token = create_access_token(
             {"sub": str(user.id), "org_id": str(user.org_id), "role": user.role},
@@ -79,8 +75,6 @@ def test_get_me_expired_jwt(client):
         response = client.get("/auth/me", headers=headers)
         assert response.status_code == 401
         assert "expired" in response.json()["detail"].lower()
-    finally:
-        db_session.close()
 
 
 def test_get_me_invalid_jwt(client):
@@ -370,9 +364,8 @@ def test_refresh_token_using_access_token_fails(client):
 
 
 def test_audit_log_safety(client):
-    db_session = SessionLocal()
-    try:
-        from app.models import AuditLog
+    from app.models import AuditLog
+    with SessionLocal() as db_session:
         audit_entries = db_session.query(AuditLog).all()
         assert len(audit_entries) > 0
 
@@ -382,5 +375,6 @@ def test_audit_log_safety(client):
             assert "password" not in details_str
             assert "access_token" not in details_str
             assert "refresh_token" not in details_str
-    finally:
+        db_session.expunge_all()
+        db_session.rollback()
         db_session.close()

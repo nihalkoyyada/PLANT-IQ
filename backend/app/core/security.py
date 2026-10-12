@@ -7,12 +7,15 @@ from typing import Any, Dict, Optional
 import bcrypt
 import jwt
 
-# Security Configuration
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "plantiq-secret-key-change-in-production-2026")
-ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
-ALLOW_SELF_REGISTRATION_ROLE_SELECTION = os.getenv("ALLOW_SELF_REGISTRATION_ROLE_SELECTION", "true").lower() in ("true", "1", "yes")
+from app.core.config import settings
+
+# Security Configuration loaded from Central Settings
+SECRET_KEY = settings.SECRET_KEY
+JWT_SECRET_KEY = settings.JWT_SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
+ALLOW_SELF_REGISTRATION_ROLE_SELECTION = settings.ALLOW_SELF_REGISTRATION_ROLE_SELECTION
 
 
 

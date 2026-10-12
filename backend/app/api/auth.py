@@ -113,6 +113,22 @@ def register(
             detail="Password must be at least 6 characters long",
         )
 
+    # Validate role first
+    requested_role = (request.role or "viewer").strip().lower()
+    if requested_role not in ("admin", "engineer", "viewer"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Role must be one of 'admin', 'engineer', or 'viewer'",
+        )
+
+    if not ALLOW_SELF_REGISTRATION_ROLE_SELECTION and requested_role in ("admin", "engineer"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Self-registration of admin or engineer roles is restricted",
+        )
+
+    role = requested_role if ALLOW_SELF_REGISTRATION_ROLE_SELECTION else "viewer"
+
     # Check for existing user
     existing_user = db.execute(select(User).where(User.email == email_clean)).scalars().first()
     if existing_user is not None:
@@ -143,22 +159,6 @@ def register(
             db.add(org)
             db.commit()
             db.refresh(org)
-
-    # Validate role
-    requested_role = (request.role or "viewer").strip().lower()
-    if requested_role not in ("admin", "engineer", "viewer"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Role must be one of 'admin', 'engineer', or 'viewer'",
-        )
-
-    if not ALLOW_SELF_REGISTRATION_ROLE_SELECTION and requested_role in ("admin", "engineer"):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Self-registration of admin or engineer roles is restricted",
-        )
-
-    role = requested_role if ALLOW_SELF_REGISTRATION_ROLE_SELECTION else "viewer"
 
 
     hashed_pw = get_password_hash(request.password)

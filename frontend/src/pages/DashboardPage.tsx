@@ -41,14 +41,16 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
           getEvents().catch(() => []),
         ]);
 
-        if (plantsData.length > 0) {
-          setPlant(plantsData[0]);
+        const currentPlant = plantsData.length > 0 ? plantsData[0] : null;
+        if (currentPlant) {
+          setPlant(currentPlant);
         }
         setEventsList(eventsData);
 
-        // 1. Determine inverter assets dynamically from API response
+        // 1. Determine inverter assets dynamically from API response, scoped to current plant
         const inverters = assetsData.filter(
-          (a) => a.asset_type === 'inverter' || a.name.toLowerCase().includes('inverter')
+          (a) => (currentPlant ? a.plant_id === currentPlant.id : true) &&
+                 (a.asset_type === 'inverter' || a.name.toLowerCase().includes('inverter'))
         );
         setInverterCount(inverters.length);
         setChannelCount(channelsData.length);
@@ -101,21 +103,44 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
 
             const plantBucketMap = new Map<string, { acKw: number; dcKw: number }>();
 
-            acAggResults.forEach((channelAgg) => {
+            const normalizeChannelPowerToKw = (
+              val: number,
+              channel?: { receive_unit?: string | null; conversion?: string | null },
+              isDc: boolean = false
+            ): number => {
+              if (val === null || val === undefined || isNaN(val)) return 0;
+              const unit = (channel?.receive_unit || '').toLowerCase();
+              const conv = (channel?.conversion || '').toLowerCase();
+              if (unit === 'w' || unit === 'watt') return val / 1000.0;
+              if (unit === 'mw' || unit === 'megawatt') return val * 1000.0;
+              if (unit === 'deci-kw' || conv.includes('10')) return val / 10.0;
+              if (unit === 'kw' || unit === 'kilowatt') {
+                if (isDc && val > 250.0) return val / 10.0;
+                return val;
+              }
+              if (val > 50000) return val / 1000.0;
+              if (isDc && val > 250.0) return val / 10.0;
+              if (val > 2500) return val / 10.0;
+              return val;
+            };
+
+            acAggResults.forEach((channelAgg, chIdx) => {
+              const ch = acChannels[chIdx];
               channelAgg.forEach((item) => {
                 if (item.start && item.average_value !== null && item.average_value !== undefined) {
                   const existing = plantBucketMap.get(item.start) || { acKw: 0, dcKw: 0 };
-                  existing.acKw += item.average_value;
+                  existing.acKw += normalizeChannelPowerToKw(item.average_value, ch, false);
                   plantBucketMap.set(item.start, existing);
                 }
               });
             });
 
-            dcAggResults.forEach((channelAgg) => {
+            dcAggResults.forEach((channelAgg, chIdx) => {
+              const ch = dcChannels[chIdx];
               channelAgg.forEach((item) => {
                 if (item.start && item.average_value !== null && item.average_value !== undefined) {
                   const existing = plantBucketMap.get(item.start) || { acKw: 0, dcKw: 0 };
-                  existing.dcKw += item.average_value;
+                  existing.dcKw += normalizeChannelPowerToKw(item.average_value, ch, true);
                   plantBucketMap.set(item.start, existing);
                 }
               });
@@ -191,15 +216,24 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
   // Sum of hourly plant AC MW generation = total MWh energy over loaded period
   const totalMWh = chartData.reduce((acc, pt) => acc + (pt.acPower || 0), 0);
 
+  // Gross generation strictly aligned with selected plant and KPI reporting window
+  const grossGenerationMWh = topLosersData?.total_actual_mwh !== undefined && topLosersData?.total_actual_mwh !== null
+    ? topLosersData.total_actual_mwh
+    : (hasTelemetry ? totalMWh : 0.0);
+
+  const grossHours = selectedRange === '24h' ? 24 : selectedRange === '7d' ? 168 : 720;
+
   // Actual PR calculated strictly from real telemetry/KPI engine
-  const actualPRNumber: number | null =
-    topLosersData?.plant_pr ??
-    (topLosersData?.has_data && topLosersData.total_expected_mwh > 0
-      ? (topLosersData.total_actual_mwh / topLosersData.total_expected_mwh) * 100
-      : null);
+  const actualPRNumber: number | null = topLosersData?.plant_pr ?? null;
 
   const hasActualPR = hasTelemetry && actualPRNumber !== null && actualPRNumber !== undefined;
   const displayPRValue = hasActualPR ? actualPRNumber.toFixed(1) : '--';
+
+  const prSubtext = hasActualPR
+    ? 'Provisional PR (IEC 61724-1)'
+    : (topLosersData?.has_data && !topLosersData.has_poa
+      ? 'No POA Irradiance Baseline'
+      : 'No Telemetry');
 
   const handleRangeChangeFromChart = (range: '24H' | '7D' | '30D') => {
     const rangeKey = range.toLowerCase() as '24h' | '7d' | '30d';
@@ -282,9 +316,9 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="GROSS GENERATION"
-          value={hasTelemetry ? totalMWh.toFixed(1) : '0.0'}
+          value={hasTelemetry ? grossGenerationMWh.toFixed(1) : '0.0'}
           unit="MWh"
-          change={hasTelemetry ? `${chartData.length} hours aggregate` : 'No telemetry'}
+          change={hasTelemetry ? `${selectedRange.toUpperCase()} (${grossHours}h aggregate)` : 'No telemetry'}
           isPositive={hasTelemetry}
           badgeText={hasTelemetry ? 'AGGREGATED' : 'EMPTY'}
           badgeVariant={hasTelemetry ? 'emerald' : 'blue'}
@@ -293,9 +327,9 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
           title="PR INDEX"
           value={displayPRValue}
           unit={hasActualPR ? '%' : ''}
-          change={hasActualPR ? 'Actual PR' : 'No telemetry'}
+          change={prSubtext}
           isPositive={hasActualPR ? actualPRNumber! >= parseFloat(targetPRVal) : false}
-          subtitle={`Target PR: ${targetPRVal}%`}
+          subtitle={hasActualPR ? `Target: ${targetPRVal}% • Provisional (28.28 MWp)` : `Target PR: ${targetPRVal}%`}
           progress={hasActualPR ? actualPRNumber! : undefined}
         />
         <MetricCard

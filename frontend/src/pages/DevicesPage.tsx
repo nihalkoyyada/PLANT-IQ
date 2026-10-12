@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DeviceTable, DeviceItem } from '../components/devices/DeviceTable';
+import { DeviceChart } from '../components/devices/DeviceChart';
 import { getAssets } from '../api/assets';
 import { getChannels } from '../api/channels';
 import {
@@ -191,12 +192,21 @@ export const DevicesPage: React.FC = () => {
               } catch (_) {}
             }
 
+            const ratedKw =
+              inv.rated_kw !== null && inv.rated_kw !== undefined && Number(inv.rated_kw) > 0
+                ? Number(inv.rated_kw)
+                : inv.metadata?.rated_ac_kw !== null &&
+                  inv.metadata?.rated_ac_kw !== undefined &&
+                  Number(inv.metadata.rated_ac_kw) > 0
+                ? Number(inv.metadata.rated_ac_kw)
+                : undefined;
+
             return {
               id: inv.id,
               name: inv.name,
               sourceKey: inv.metadata?.source_key || inv.name,
               assetType: inv.asset_type,
-              ratedKw: inv.rated_kw || 50,
+              ratedKw,
               status: acChannel || dcChannel ? 'ONLINE' : 'OFFLINE',
               lastReading,
               acPowerKw,
@@ -205,6 +215,8 @@ export const DevicesPage: React.FC = () => {
               dcTimestamp,
               dailyYieldKwh,
               totalYieldKwh,
+              acChannelId: acChannel?.id,
+              dcChannelId: dcChannel?.id,
             };
           })
         );
@@ -299,7 +311,11 @@ export const DevicesPage: React.FC = () => {
                 </div>
 
                 <div className="text-sm font-bold text-slate-800">
-                  {selectedDevice.ratedKw} kW
+                  {selectedDevice.ratedKw !== undefined && selectedDevice.ratedKw !== null ? (
+                    `${selectedDevice.ratedKw} kW`
+                  ) : (
+                    <span className="text-slate-400 font-normal">N/A</span>
+                  )}
                 </div>
               </div>
 
@@ -371,8 +387,8 @@ export const DevicesPage: React.FC = () => {
             </div>
 
             {/* Historical Telemetry */}
-            <div className="border-t border-slate-100 pt-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 mb-2">
+            <div className="border-t border-slate-100 pt-4 space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
                 <ChartIcon className="w-4 h-4 text-sky-600" />
                 <span>HISTORICAL TELEMETRY TREND</span>
               </div>
@@ -380,6 +396,14 @@ export const DevicesPage: React.FC = () => {
               <p className="text-xs text-slate-500 font-mono">
                 5-minute cadence readings synchronized from database telemetry.
               </p>
+
+              <DeviceChart
+                acChannelId={selectedDevice.acChannelId}
+                dcChannelId={selectedDevice.dcChannelId}
+                latestTimestamp={
+                  selectedDevice.acTimestamp || selectedDevice.dcTimestamp || selectedDevice.lastReading
+                }
+              />
             </div>
           </div>
         </div>

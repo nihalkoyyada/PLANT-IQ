@@ -7,7 +7,7 @@ export interface DeviceItem {
   name: string;
   sourceKey: string;
   assetType: string;
-  ratedKw: number;
+  ratedKw?: number | null;
   status: 'ONLINE' | 'MAINTENANCE' | 'OFFLINE';
   lastReading: string;
   acPowerKw?: number;
@@ -16,6 +16,8 @@ export interface DeviceItem {
   dcTimestamp?: string;
   dailyYieldKwh?: number;
   totalYieldKwh?: number;
+  acChannelId?: string;
+  dcChannelId?: string;
 }
 
 const formatReadingTime = (tsStr?: string): string | null => {
@@ -106,7 +108,9 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({ devices, onSelectDevic
                     </div>
                   </td>
                   <td className="py-3 px-3 capitalize text-slate-600">{dev.assetType}</td>
-                  <td className="py-3 px-3 font-semibold text-slate-800">{dev.ratedKw} kW</td>
+                  <td className="py-3 px-3 font-semibold text-slate-800">
+                    {dev.ratedKw !== undefined && dev.ratedKw !== null ? `${dev.ratedKw} kW` : <span className="text-slate-400 font-normal">N/A</span>}
+                  </td>
                   <td className="py-3 px-3">
                     <Badge variant={dev.status === 'ONLINE' ? 'emerald' : 'rose'}>
                       ● {dev.status}

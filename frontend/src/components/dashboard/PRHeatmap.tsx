@@ -31,29 +31,34 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
           <div className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-sky-600" />
             <h3 className="text-sm font-semibold uppercase text-slate-800 tracking-wider">
-              Performance Ratio (PR) Heatmap
+              Performance Heatmap
             </h3>
           </div>
         </div>
         <div className="h-40 flex items-center justify-center text-slate-400 font-mono text-sm border border-dashed border-slate-200 rounded-lg">
-          No PR heatmap data available for the selected period.
+          No heatmap telemetry data available for the selected period.
         </div>
       </div>
     );
   }
 
   const getCellColor = (cell: PRHeatmapCell) => {
-    if (!cell.has_data || cell.pr === null) {
+    const val = cell.pr ?? cell.efficiency;
+    if (!cell.has_data || val === null || val === undefined) {
       return 'bg-slate-100 text-slate-400 border border-slate-200/60';
     }
-    if (cell.pr >= 85) {
+    if (val >= 85) {
       return 'bg-emerald-500 hover:bg-emerald-600 text-white font-medium shadow-2xs';
     }
-    if (cell.pr >= 75) {
+    if (val >= 75) {
       return 'bg-sky-500 hover:bg-sky-600 text-white font-medium shadow-2xs';
     }
     return 'bg-rose-500 hover:bg-rose-600 text-white font-medium shadow-2xs';
   };
+
+  const titleText = data.has_poa
+    ? `Performance Ratio (PR) Heatmap (${data.range.toUpperCase()})`
+    : `Inverter Efficiency Heatmap (AC/DC Ratio - ${data.range.toUpperCase()})`;
 
   return (
     <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs relative">
@@ -62,7 +67,7 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
         <div className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-sky-600" />
           <h3 className="text-sm font-semibold uppercase text-slate-800 tracking-wider font-mono">
-            Performance Ratio (PR) Heatmap ({data.range.toUpperCase()})
+            {titleText}
           </h3>
         </div>
 
@@ -70,7 +75,7 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
         <div className="flex items-center gap-3 text-xs font-mono">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-emerald-500 inline-block"></span>
-            <span className="text-slate-600">≥85% Healthy</span>
+            <span className="text-slate-600">≥85% {data.has_poa ? 'Healthy' : 'Optimal'}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-sky-500 inline-block"></span>
@@ -78,7 +83,7 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-rose-500 inline-block"></span>
-            <span className="text-slate-600">&lt;75% Degraded</span>
+            <span className="text-slate-600">&lt;75% Low</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-slate-200 border border-slate-300 inline-block"></span>
@@ -111,30 +116,33 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
                 <td className="py-1.5 px-3 font-mono font-semibold text-slate-800 whitespace-nowrap sticky left-0 bg-white z-10 border-r border-slate-200 shadow-xs">
                   {row.asset_name}
                 </td>
-                {row.cells.map((cell, cIdx) => (
-                  <td
-                    key={cIdx}
-                    className="p-1 text-center min-w-[52px]"
-                    onMouseEnter={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setActiveTooltip({
-                        inverter: row.asset_name,
-                        cell,
-                        x: rect.left + rect.width / 2,
-                        y: rect.top - 8,
-                      });
-                    }}
-                    onMouseLeave={() => setActiveTooltip(null)}
-                  >
-                    <div
-                      className={`h-7 rounded-xs flex items-center justify-center font-mono text-[11px] cursor-pointer transition-transform hover:scale-105 ${getCellColor(
-                        cell
-                      )}`}
+                {row.cells.map((cell, cIdx) => {
+                  const displayVal = cell.pr !== null ? `${cell.pr}%` : (cell.efficiency !== null ? `${cell.efficiency}%` : 'N/A');
+                  return (
+                    <td
+                      key={cIdx}
+                      className="p-1 text-center min-w-[52px]"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setActiveTooltip({
+                          inverter: row.asset_name,
+                          cell,
+                          x: rect.left + rect.width / 2,
+                          y: rect.top - 8,
+                        });
+                      }}
+                      onMouseLeave={() => setActiveTooltip(null)}
                     >
-                      {cell.has_data && cell.pr !== null ? `${cell.pr}%` : 'N/A'}
-                    </div>
-                  </td>
-                ))}
+                      <div
+                        className={`h-7 rounded-xs flex items-center justify-center font-mono text-[11px] cursor-pointer transition-transform hover:scale-105 ${getCellColor(
+                          cell
+                        )}`}
+                      >
+                        {cell.has_data ? displayVal : 'N/A'}
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -151,22 +159,19 @@ export const PRHeatmap: React.FC<PRHeatmapProps> = ({ data, loading }) => {
             <span>{activeTooltip.inverter}</span>
             <span className="text-[10px] text-slate-400">{activeTooltip.cell.label}</span>
           </div>
-          {activeTooltip.cell.has_data && activeTooltip.cell.pr !== null ? (
+          {activeTooltip.cell.has_data ? (
             <div className="space-y-0.5">
-              <div className="flex justify-between">
-                <span className="text-slate-400">PR Ratio:</span>
-                <span
-                  className={
-                    activeTooltip.cell.pr >= 85
-                      ? 'text-emerald-400 font-bold'
-                      : activeTooltip.cell.pr >= 75
-                      ? 'text-sky-400 font-bold'
-                      : 'text-rose-400 font-bold'
-                  }
-                >
-                  {activeTooltip.cell.pr}%
-                </span>
-              </div>
+              {activeTooltip.cell.pr !== null ? (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">PR Ratio:</span>
+                  <span className="text-emerald-400 font-bold">{activeTooltip.cell.pr}%</span>
+                </div>
+              ) : activeTooltip.cell.efficiency !== null ? (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Efficiency (η):</span>
+                  <span className="text-emerald-400 font-bold">{activeTooltip.cell.efficiency}%</span>
+                </div>
+              ) : null}
               {activeTooltip.cell.ac_kw !== null && (
                 <div className="flex justify-between">
                   <span className="text-slate-400">AC Power:</span>

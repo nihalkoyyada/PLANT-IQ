@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
 from app.api.organizations import router as organizations_router
@@ -16,6 +17,7 @@ from app.api.kpis import router as kpis_router
 from app.api.canonical_signals import router as canonical_signals_router
 from app.api.detectors import router as detectors_router
 from app.api.dev import router as dev_router
+from app.core.config import settings
 from app.db.session import create_db_engine, get_session_factory
 from app.models import Asset
 
@@ -38,11 +40,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PlantIQ API",
+    title=settings.PROJECT_NAME,
     description="Backend API for the PlantIQ solar plant monitoring platform",
-    version="1.0.0",
+    version=settings.VERSION,
     lifespan=lifespan,
 )
+
+if settings.CORS_ORIGINS:
+    cors_origins = settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 app.include_router(auth_router)
@@ -62,11 +74,9 @@ app.include_router(ai_router)
 app.include_router(dev_router)
 
 
-
 @app.get("/health")
 def health_check():
     return {
         "status": "healthy",
-        "service": "PlantIQ API",
+        "service": settings.PROJECT_NAME,
     }
-

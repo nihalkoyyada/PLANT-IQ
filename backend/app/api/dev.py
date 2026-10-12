@@ -23,6 +23,9 @@ router = APIRouter(
 )
 
 
+MODELS_TO_CLEAR = [Reading, JobHistory, IngestionJob, Channel, Asset, File, MappingTemplate]
+
+
 @router.post(
     "/reset-scada",
     status_code=status.HTTP_200_OK,
@@ -33,13 +36,13 @@ def reset_scada_data(
 ):
     """Development/Demo reset endpoint: clears all ingested SCADA telemetry data while preserving users, auth, orgs, and DB schema."""
     try:
-        models_to_clear = [Reading, JobHistory, IngestionJob, Channel, Asset, File, MappingTemplate]
         cleared_counts = {}
 
-        # Set parent_id to NULL on Asset first to prevent self-referential foreign key constraint blocks
-        db.query(Asset).update({Asset.parent_id: None}, synchronize_session=False)
+        if MODELS_TO_CLEAR:
+            # Set parent_id to NULL on Asset first to prevent self-referential foreign key constraint blocks
+            db.query(Asset).update({Asset.parent_id: None}, synchronize_session=False)
 
-        for ModelClass in models_to_clear:
+        for ModelClass in MODELS_TO_CLEAR:
             count = db.query(ModelClass).delete(synchronize_session=False)
             cleared_counts[ModelClass.__name__] = count
 

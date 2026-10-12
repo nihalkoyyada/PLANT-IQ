@@ -9,20 +9,13 @@ Configures:
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from celery import Celery  # type: ignore[import-untyped]
 from celery.schedules import crontab  # type: ignore[import-untyped]
-from dotenv import load_dotenv
 
-# Ensure environment variables are loaded
-BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env")
+from app.core.config import settings
 
-# Broker & backend URLs
-DEFAULT_BROKER_URL = "redis://localhost:6379/0"
-broker_url = os.getenv("CELERY_BROKER_URL", os.getenv("REDIS_URL", DEFAULT_BROKER_URL))
-result_backend = os.getenv("CELERY_RESULT_BACKEND", os.getenv("REDIS_URL", DEFAULT_BROKER_URL))
+broker_url = settings.CELERY_BROKER_URL
+result_backend = settings.CELERY_RESULT_BACKEND
 
 celery_app = Celery(
     "plantiq",

@@ -17,7 +17,7 @@ from datetime import date, datetime, timezone
 import hashlib
 import os
 from typing import Any, Dict, List, Optional
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 import typer
 
@@ -517,6 +517,37 @@ def seed_surya_data(
             session.add(ch)
 
     session.commit()
+
+    # 7. Seed Weather Sensor Readings from Plant_1_Weather_Sensor_Data.csv if missing
+    poa_ch = session.execute(
+        select(Channel).where(Channel.asset_id == ws_asset.id, Channel.canonical_key == "irradiance_poa")
+    ).scalar_one_or_none()
+
+    if poa_ch is not None:
+        from app.models.entities import Reading
+        existing_readings = session.execute(
+            select(func.count(Reading.ts)).where(Reading.channel_id == poa_ch.id)
+        ).scalar() or 0
+
+        if existing_readings == 0:
+            csv_path = os.path.join(os.path.dirname(__file__), "..", "..", "datasets", "Plant_1_Weather_Sensor_Data.csv")
+            if os.path.exists(csv_path):
+                import csv
+                readings_list = []
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        dt_str = row.get("DATE_TIME", "").strip()
+                        try:
+                            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        except ValueError:
+                            continue
+                        irrad_val = float(row["IRRADIATION"]) if row.get("IRRADIATION") else 0.0
+                        readings_list.append(Reading(channel_id=poa_ch.id, ts=dt, value=irrad_val, quality=100))
+
+                if readings_list:
+                    session.bulk_save_objects(readings_list)
+                    session.commit()
 
     # Query counts for confirmation
     total_assets = session.execute(

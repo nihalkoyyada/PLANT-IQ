@@ -1,0 +1,1604 @@
+[
+  {
+    "id": "GOLDEN-001",
+    "category": "plant_summary",
+    "question": "What is the total AC capacity of Surya-A?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "capacity_ac_kw": 27500.0
+    },
+    "tolerance": 0.02,
+    "description": "Plant AC capacity in kW.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-002",
+    "category": "plant_summary",
+    "question": "What is the total DC capacity rating in kWp for the plant?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "capacity_dc_kwp": 28280.55
+    },
+    "tolerance": 0.02,
+    "description": "Plant DC peak capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-003",
+    "category": "plant_summary",
+    "question": "How many inverters are currently installed at the plant?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "inverters": 22.0
+    },
+    "tolerance": 0.0,
+    "description": "Count of active central inverters.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-004",
+    "category": "plant_summary",
+    "question": "What is the benchmark expected Performance Ratio for this site?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "expected_pr": 80.0
+    },
+    "tolerance": 0.02,
+    "description": "Expected benchmark PR percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-005",
+    "category": "plant_summary",
+    "question": "What is the power purchase tariff configured for the plant in INR per kWh?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "tariff": 3.5
+    },
+    "tolerance": 0.02,
+    "description": "Configured PPA tariff in INR.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-006",
+    "category": "plant_summary",
+    "question": "Give me a high-level overview of the total asset count at Surya-A.",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "total_assets": 24.0
+    },
+    "tolerance": 0.0,
+    "description": "Total assets (Block + 22 Inverters + 1 WS).",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-007",
+    "category": "plant_summary",
+    "question": "How many weather stations are monitoring meteorological conditions on site?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "weather_stations": 1.0
+    },
+    "tolerance": 0.0,
+    "description": "Weather station count.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-008",
+    "category": "plant_summary",
+    "question": "What is the grid connection voltage in kV for Surya-A?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "grid_voltage_kv": 33.0
+    },
+    "tolerance": 0.02,
+    "description": "33 kV evacuation line rating.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-009",
+    "category": "plant_summary",
+    "question": "What is the default operational summary evaluation window in hours?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "window_hours": 24.0
+    },
+    "tolerance": 0.02,
+    "description": "24-hour default overview window.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-010",
+    "category": "plant_summary",
+    "question": "Confirm the maximum peak AC generation capacity of the entire inverter fleet.",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "peak_ac_kw": 27500.0
+    },
+    "tolerance": 0.02,
+    "description": "Full AC nameplate output.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-011",
+    "category": "plant_summary",
+    "question": "What is the baseline annual Capacity Utilization Factor (CUF) design benchmark?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "benchmark_cuf": 21.0
+    },
+    "tolerance": 0.02,
+    "description": "Expected 24h solar CUF percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-012",
+    "category": "plant_summary",
+    "question": "What is the DC to AC sizing ratio (overplanting factor) for this plant?",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "dc_ac_ratio": 1.028
+    },
+    "tolerance": 0.02,
+    "description": "28280.55 kWp / 27500 kW = 1.028 ratio.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-013",
+    "category": "plant_summary",
+    "question": "Check plant health summary and verify total inverters and AC capacity.",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "capacity_ac_kw": 27500.0,
+      "inverters": 22.0
+    },
+    "tolerance": 0.02,
+    "description": "Combined capacity and inverter count check.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-014",
+    "category": "plant_summary",
+    "question": "Retrieve the plant overview and expected PR percentage.",
+    "expected_tools": [
+      "get_plant_summary"
+    ],
+    "expected_numbers": {
+      "expected_pr": 80.0,
+      "tariff": 3.5
+    },
+    "tolerance": 0.02,
+    "description": "PR and tariff verification.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-015",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC capacity of Inverter INV-01?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-01 AC nameplate capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-016",
+    "category": "asset_hierarchy",
+    "question": "What is the rated DC peak capacity of Inverter INV-01?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_dc_kwp": 1285.48
+    },
+    "tolerance": 0.02,
+    "description": "INV-01 DC rating.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-017",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC capacity of Inverter INV-02?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-02 AC nameplate capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-018",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC power of Inverter INV-05?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-05 AC capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-019",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC power of Inverter INV-10?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-10 AC capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-020",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC power of Inverter INV-15?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-15 AC capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-021",
+    "category": "asset_hierarchy",
+    "question": "What is the rated AC power of Inverter INV-22?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_ac_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "INV-22 AC capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-022",
+    "category": "asset_hierarchy",
+    "question": "List all inverters and confirm the total number in Block-01.",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "inverter_count": 22.0
+    },
+    "tolerance": 0.0,
+    "description": "Inverters count in Block-01.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-023",
+    "category": "asset_hierarchy",
+    "question": "How many telemetry channels are configured for the 22 inverters combined?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "inverter_channels": 88.0
+    },
+    "tolerance": 0.0,
+    "description": "4 signals x 22 inverters = 88 channels.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-024",
+    "category": "asset_hierarchy",
+    "question": "How many weather telemetry channels are mapped on weather station WS-01?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "ws_channels": 3.0
+    },
+    "tolerance": 0.0,
+    "description": "Irradiance, module temp, ambient temp.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-025",
+    "category": "asset_hierarchy",
+    "question": "What is the total number of SCADA telemetry channels in the entire Surya-A asset tree?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "total_channels": 91.0
+    },
+    "tolerance": 0.0,
+    "description": "88 inverter channels + 3 WS channels = 91.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-026",
+    "category": "asset_hierarchy",
+    "question": "How many parent blocks group the inverters in Surya-A?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "block_count": 1.0
+    },
+    "tolerance": 0.0,
+    "description": "Synthetic Block-01 grouping.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-027",
+    "category": "asset_hierarchy",
+    "question": "Confirm the model nameplate power for Central-1250 inverters.",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "nameplate_kw": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "Standard central inverter model rating.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-028",
+    "category": "asset_hierarchy",
+    "question": "What is the individual DC capacity of INV-20?",
+    "expected_tools": [
+      "list_assets"
+    ],
+    "expected_numbers": {
+      "rated_dc_kwp": 1285.48
+    },
+    "tolerance": 0.02,
+    "description": "INV-20 DC peak capacity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-029",
+    "category": "kpi_computation",
+    "question": "What is the benchmark expected Performance Ratio for solar generation?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "expected_pr": 80.0
+    },
+    "tolerance": 0.02,
+    "description": "Benchmark expected PR percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-030",
+    "category": "kpi_computation",
+    "question": "What is the baseline 24-hour Capacity Utilization Factor for this plant?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "benchmark_cuf": 21.0
+    },
+    "tolerance": 0.02,
+    "description": "Benchmark 24-hour CUF percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-031",
+    "category": "kpi_computation",
+    "question": "What is the target daylight operational availability percentage?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "availability": 99.5
+    },
+    "tolerance": 0.02,
+    "description": "Benchmark daylight availability target.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-032",
+    "category": "kpi_computation",
+    "question": "What is the expected daily specific yield in kWh per kWp under design conditions?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "specific_yield": 4.85
+    },
+    "tolerance": 0.02,
+    "description": "Daily design specific yield Yf.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-033",
+    "category": "kpi_computation",
+    "question": "What is the design inverter conversion efficiency percentage?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "efficiency": 97.2
+    },
+    "tolerance": 0.02,
+    "description": "Inverter conversion efficiency AC/DC.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-034",
+    "category": "kpi_computation",
+    "question": "What is the benchmark daily solar insolation in kWh per square meter?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "daily_insolation": 5.8
+    },
+    "tolerance": 0.02,
+    "description": "Daily design POA insolation H_poa.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-035",
+    "category": "kpi_computation",
+    "question": "What is the expected soiling loss factor allowed in design PR?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "soiling_loss": 2.0
+    },
+    "tolerance": 0.02,
+    "description": "Standard design soiling loss percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-036",
+    "category": "kpi_computation",
+    "question": "What is the expected annual PV module degradation rate percentage?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "degradation_rate": 0.5
+    },
+    "tolerance": 0.02,
+    "description": "Standard annual degradation rate.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-037",
+    "category": "kpi_computation",
+    "question": "What is the nighttime irradiance threshold cutoff in W/m2 used in daylight filtering?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "night_cutoff": 50.0
+    },
+    "tolerance": 0.02,
+    "description": "IEC 61724-1 nighttime filter threshold.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-038",
+    "category": "kpi_computation",
+    "question": "How many daylight hours are typically evaluated for daytime CUF?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "daylight_hours": 12.0
+    },
+    "tolerance": 0.02,
+    "description": "Daylight evaluation hours.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-039",
+    "category": "kpi_computation",
+    "question": "What is the PR deviation threshold that triggers a performance alarm?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "alarm_deviation": 5.0
+    },
+    "tolerance": 0.02,
+    "description": "PR deviation alarm threshold percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-040",
+    "category": "kpi_computation",
+    "question": "What is the tariff rate used to calculate financial energy loss in INR/kWh?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "tariff": 3.5
+    },
+    "tolerance": 0.02,
+    "description": "Tariff multiplier for energy loss.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-041",
+    "category": "kpi_computation",
+    "question": "What is the expected annual CUF benchmark for Bhadla Solar Park?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "annual_cuf": 20.5
+    },
+    "tolerance": 0.02,
+    "description": "High-irradiance desert site CUF.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-042",
+    "category": "kpi_computation",
+    "question": "What is the minimum required telemetry coverage percentage for valid KPI calculations?",
+    "expected_tools": [
+      "compute_kpi"
+    ],
+    "expected_numbers": {
+      "min_coverage": 70.0
+    },
+    "tolerance": 0.02,
+    "description": "70% coverage rule for KPI validity.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-043",
+    "category": "timeseries_query",
+    "question": "What is the rated peak active power for central inverter INV-01?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "rated_power": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "Peak AC rating in kW.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-044",
+    "category": "timeseries_query",
+    "question": "What is the standard peak solar irradiance at STC in W per square meter?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "stc_irradiance": 1000.0
+    },
+    "tolerance": 0.02,
+    "description": "STC 1000 W/m2 irradiance baseline.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-045",
+    "category": "timeseries_query",
+    "question": "What is the standard test condition cell temperature in degrees Celsius?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "stc_temp": 25.0
+    },
+    "tolerance": 0.02,
+    "description": "STC 25 \u00b0C module temperature.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-046",
+    "category": "timeseries_query",
+    "question": "What is the nominal operating cell temperature (NOCT) benchmark in degrees Celsius?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "noct_temp": 45.0
+    },
+    "tolerance": 0.02,
+    "description": "NOCT 45 \u00b0C benchmark.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-047",
+    "category": "timeseries_query",
+    "question": "What is the typical daytime ambient temperature design ceiling in desert climates in \u00b0C?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "ambient_temp": 38.5
+    },
+    "tolerance": 0.02,
+    "description": "Desert ambient temperature benchmark.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-048",
+    "category": "timeseries_query",
+    "question": "What is the standard SCADA sampling cadence in minutes for solar telemetry?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "cadence_minutes": 15.0
+    },
+    "tolerance": 0.0,
+    "description": "15-minute standard sampling interval.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-049",
+    "category": "timeseries_query",
+    "question": "What is the duration in seconds of a 15-minute telemetry bucket?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "bucket_seconds": 900.0
+    },
+    "tolerance": 0.0,
+    "description": "15m = 900s.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-050",
+    "category": "timeseries_query",
+    "question": "What is the duration in seconds of a 1-hour aggregation bucket?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "hourly_seconds": 3600.0
+    },
+    "tolerance": 0.0,
+    "description": "1h = 3600s.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-051",
+    "category": "timeseries_query",
+    "question": "What is the duration in seconds of a 1-day temporal aggregation bucket?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "daily_seconds": 86400.0
+    },
+    "tolerance": 0.0,
+    "description": "1d = 86400s.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-052",
+    "category": "timeseries_query",
+    "question": "What is the maximum number of timeseries points returned before caching in ResultRefStore?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "max_points": 50.0
+    },
+    "tolerance": 0.0,
+    "description": "50-point array threshold for caching.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-053",
+    "category": "timeseries_query",
+    "question": "What is the maximum DC input capacity for central inverter INV-01 in kW?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "dc_capacity": 1285.48
+    },
+    "tolerance": 0.02,
+    "description": "INV-01 DC maximum rating.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-054",
+    "category": "timeseries_query",
+    "question": "What is the typical daily generation milestone in kWh for a 1.25 MW central inverter on a sunny day?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "daily_yield_kwh": 6500.0
+    },
+    "tolerance": 0.1,
+    "description": "Daily generation benchmark.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-055",
+    "category": "timeseries_query",
+    "question": "What is the temperature coefficient of power Pmax percentage per degree Celsius?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "temp_coeff": -0.38
+    },
+    "tolerance": 0.02,
+    "description": "Silicon crystalline temp coefficient.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-056",
+    "category": "timeseries_query",
+    "question": "What is the high cell temperature derating threshold in degrees Celsius?",
+    "expected_tools": [
+      "query_timeseries"
+    ],
+    "expected_numbers": {
+      "derating_temp": 65.0
+    },
+    "tolerance": 0.02,
+    "description": "High temperature thermal derating limit.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-057",
+    "category": "compare_assets",
+    "question": "How many inverters are evaluated when comparing the entire Surya-A fleet?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "total_compared": 22.0
+    },
+    "tolerance": 0.0,
+    "description": "22 inverters in fleet comparison.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-058",
+    "category": "compare_assets",
+    "question": "What is the top rated AC power among inverters in Surya-A?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "top_ac_power": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "Top inverter AC power rating.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-059",
+    "category": "compare_assets",
+    "question": "What is the average rated AC power across all 22 central inverters?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "avg_ac_power": 1250.0
+    },
+    "tolerance": 0.02,
+    "description": "Homogeneous fleet average.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-060",
+    "category": "compare_assets",
+    "question": "What is the rating capacity spread across the inverter fleet in kW?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "spread_kw": 0.0
+    },
+    "tolerance": 0.0,
+    "description": "Identical central inverters (0 kW spread).",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-061",
+    "category": "compare_assets",
+    "question": "How many inverters constitute the top half of the fleet ranking?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "half_fleet": 11.0
+    },
+    "tolerance": 0.0,
+    "description": "11 inverters in top half.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-062",
+    "category": "compare_assets",
+    "question": "What is the target conversion efficiency benchmark when comparing inverters?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "target_efficiency": 97.2
+    },
+    "tolerance": 0.02,
+    "description": "Target inverter efficiency percentage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-063",
+    "category": "compare_assets",
+    "question": "What is the underperformance deviation threshold used to flag lagging inverters?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "deviation_threshold": 5.0
+    },
+    "tolerance": 0.02,
+    "description": "5% relative deviation threshold.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-064",
+    "category": "compare_assets",
+    "question": "How many peer central inverters are available for peer-group median benchmarking?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "peer_count": 22.0
+    },
+    "tolerance": 0.0,
+    "description": "22 peer inverters.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-065",
+    "category": "compare_assets",
+    "question": "What is the minimum expected peer performance ratio percentage?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "min_pr_ratio": 95.0
+    },
+    "tolerance": 0.02,
+    "description": "95% peer ratio lower bound.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-066",
+    "category": "compare_assets",
+    "question": "What is the maximum allowed variance percentage before triggering inverter diagnostics?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "variance_limit": 10.0
+    },
+    "tolerance": 0.02,
+    "description": "10% variance limit.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-067",
+    "category": "compare_assets",
+    "question": "How many DC input strings typically feed a Central-1250 inverter?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "strings_per_inv": 16.0
+    },
+    "tolerance": 0.0,
+    "description": "16 DC input strings benchmark.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-068",
+    "category": "compare_assets",
+    "question": "How many combiner boxes feed each central inverter in Block-01?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "combiners": 8.0
+    },
+    "tolerance": 0.0,
+    "description": "8 SCBs per central inverter.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-069",
+    "category": "compare_assets",
+    "question": "How many MPPT channels are on each central inverter unit?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "mppt_channels": 1.0
+    },
+    "tolerance": 0.0,
+    "description": "Central inverters have 1 main MPPT.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-070",
+    "category": "compare_assets",
+    "question": "What is the benchmark fleet-wide operational availability target percentage?",
+    "expected_tools": [
+      "compare_assets"
+    ],
+    "expected_numbers": {
+      "fleet_availability": 99.0
+    },
+    "tolerance": 0.02,
+    "description": "Fleet availability target.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-071",
+    "category": "anomaly_analysis",
+    "question": "What is the financial tariff used to compute monetary loss for anomalies in INR/kWh?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "tariff": 3.5
+    },
+    "tolerance": 0.02,
+    "description": "Default financial loss tariff.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-072",
+    "category": "anomaly_analysis",
+    "question": "What is the financial loss threshold in INR defining critical severity anomalies?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "critical_loss": 10000.0
+    },
+    "tolerance": 0.02,
+    "description": "Critical severity > 10,000 INR.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-073",
+    "category": "anomaly_analysis",
+    "question": "What is the financial loss threshold in INR defining high severity anomalies?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "high_loss": 5000.0
+    },
+    "tolerance": 0.02,
+    "description": "High severity > 5,000 INR.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-074",
+    "category": "anomaly_analysis",
+    "question": "What is the financial loss threshold in INR defining medium severity anomalies?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "medium_loss": 1000.0
+    },
+    "tolerance": 0.02,
+    "description": "Medium severity > 1,000 INR.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-075",
+    "category": "anomaly_analysis",
+    "question": "What is the financial loss threshold in INR defining low severity anomalies?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "low_loss": 200.0
+    },
+    "tolerance": 0.02,
+    "description": "Low severity > 200 INR.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-076",
+    "category": "anomaly_analysis",
+    "question": "What is the maximum allowed time window in days for ad-hoc on-demand anomaly detection?",
+    "expected_tools": [
+      "detect_on_demand"
+    ],
+    "expected_numbers": {
+      "max_scan_days": 90.0
+    },
+    "tolerance": 0.0,
+    "description": "90 days maximum scan window.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-077",
+    "category": "anomaly_analysis",
+    "question": "What is the standard Z-score threshold used in statistical anomaly detection?",
+    "expected_tools": [
+      "detect_on_demand"
+    ],
+    "expected_numbers": {
+      "zscore_threshold": 3.0
+    },
+    "tolerance": 0.02,
+    "description": "3 sigma statistical outlier threshold.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-078",
+    "category": "anomaly_analysis",
+    "question": "What is the IQR multiplier used in Tukey boxplot anomaly detection?",
+    "expected_tools": [
+      "detect_on_demand"
+    ],
+    "expected_numbers": {
+      "iqr_multiplier": 1.5
+    },
+    "tolerance": 0.02,
+    "description": "1.5 IQR outlier multiplier.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-079",
+    "category": "anomaly_analysis",
+    "question": "How many consecutive anomalous intervals are required to confirm an anomaly?",
+    "expected_tools": [
+      "detect_on_demand"
+    ],
+    "expected_numbers": {
+      "persistence_intervals": 3.0
+    },
+    "tolerance": 0.0,
+    "description": "3 persistence intervals rule.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-080",
+    "category": "anomaly_analysis",
+    "question": "What is the clear-sky irradiance residual threshold percentage for soiling detection?",
+    "expected_tools": [
+      "detect_on_demand"
+    ],
+    "expected_numbers": {
+      "residual_threshold": 15.0
+    },
+    "tolerance": 0.02,
+    "description": "15% irradiance residual threshold.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-081",
+    "category": "anomaly_analysis",
+    "question": "What is the minimum duration in minutes for an operational anomaly to be registered?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "min_duration": 15.0
+    },
+    "tolerance": 0.0,
+    "description": "15m minimum anomaly duration.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-082",
+    "category": "anomaly_analysis",
+    "question": "What PR threshold defines severe inverter underperformance?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "underperformance_pr": 75.0
+    },
+    "tolerance": 0.02,
+    "description": "75% PR underperformance alert.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-083",
+    "category": "anomaly_analysis",
+    "question": "What soiling percentage indicates a mandatory panel cleaning requirement?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "soiling_threshold": 10.0
+    },
+    "tolerance": 0.02,
+    "description": "10% soiling cleaning trigger.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-084",
+    "category": "anomaly_analysis",
+    "question": "How many distinct anomaly types are classified in the CARE ground-truth catalog?",
+    "expected_tools": [
+      "list_anomalies"
+    ],
+    "expected_numbers": {
+      "anomaly_types_count": 4.0
+    },
+    "tolerance": 0.0,
+    "description": "4 types: soiling, trip, clipping, flatline.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-085",
+    "category": "event_listing",
+    "question": "What is the nominal grid evacuation voltage rating in kV?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "grid_voltage": 33.0
+    },
+    "tolerance": 0.02,
+    "description": "33 kV nominal evacuation voltage.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-086",
+    "category": "event_listing",
+    "question": "What is the Indian grid standard nominal frequency in Hertz?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "grid_frequency": 50.0
+    },
+    "tolerance": 0.02,
+    "description": "50 Hz nominal grid frequency.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-087",
+    "category": "event_listing",
+    "question": "What is the grid frequency operating tolerance band in Hertz around 50 Hz?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "freq_tolerance": 0.5
+    },
+    "tolerance": 0.02,
+    "description": "\u00b10.5 Hz Indian grid frequency band.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-088",
+    "category": "event_listing",
+    "question": "What is the over-voltage trip limit in kV (+10% of 33 kV)?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "over_voltage": 36.3
+    },
+    "tolerance": 0.02,
+    "description": "36.3 kV over-voltage trip.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-089",
+    "category": "event_listing",
+    "question": "What is the under-voltage trip limit in kV (-10% of 33 kV)?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "under_voltage": 29.7
+    },
+    "tolerance": 0.02,
+    "description": "29.7 kV under-voltage trip.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-090",
+    "category": "event_listing",
+    "question": "What is the standard inverter auto-restart delay in seconds following a grid trip?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "restart_delay": 300.0
+    },
+    "tolerance": 0.02,
+    "description": "300s (5-minute) restart delay.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-091",
+    "category": "event_listing",
+    "question": "What is the minimum required power factor capability at the grid point of interconnection?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "power_factor": 0.95
+    },
+    "tolerance": 0.02,
+    "description": "0.95 leading/lagging power factor.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-092",
+    "category": "event_listing",
+    "question": "What is the default operational events query window in hours?",
+    "expected_tools": [
+      "list_events"
+    ],
+    "expected_numbers": {
+      "event_window_hours": 24.0
+    },
+    "tolerance": 0.02,
+    "description": "24 hours event query window.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-093",
+    "category": "data_coverage",
+    "question": "What is the target telemetry data completeness percentage for solar sensors?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "target_coverage": 100.0
+    },
+    "tolerance": 0.02,
+    "description": "100% full coverage target.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-094",
+    "category": "data_coverage",
+    "question": "What is the minimum acceptable telemetry coverage percentage for daily reports?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "min_acceptable": 70.0
+    },
+    "tolerance": 0.02,
+    "description": "70% minimum coverage threshold.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-095",
+    "category": "data_coverage",
+    "question": "What dropout percentage triggers a sensor communication health alert?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "dropout_alert": 30.0
+    },
+    "tolerance": 0.02,
+    "description": "30% missing data dropout alert.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-096",
+    "category": "data_coverage",
+    "question": "How many 15-minute telemetry intervals are recorded in a full 24-hour day?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "daily_intervals": 96.0
+    },
+    "tolerance": 0.0,
+    "description": "24 * 4 = 96 intervals per day.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-097",
+    "category": "data_coverage",
+    "question": "How many 15-minute telemetry intervals are in a 12-hour active daylight window?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "daylight_intervals": 48.0
+    },
+    "tolerance": 0.0,
+    "description": "12 * 4 = 48 intervals.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-098",
+    "category": "data_coverage",
+    "question": "What is the default time-to-live in seconds for cached timeseries result references?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "ref_ttl_seconds": 3600.0
+    },
+    "tolerance": 0.0,
+    "description": "3600 seconds (1 hour) TTL.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-099",
+    "category": "data_coverage",
+    "question": "What is the default time-to-live in seconds for interactive chart specifications?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "chart_ttl_seconds": 7200.0
+    },
+    "tolerance": 0.0,
+    "description": "7200 seconds (2 hours) TTL.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  },
+  {
+    "id": "GOLDEN-100",
+    "category": "data_coverage",
+    "question": "What is the maximum allowed tool call limit per conversational query turn?",
+    "expected_tools": [
+      "get_data_coverage"
+    ],
+    "expected_numbers": {
+      "tool_cap": 15.0
+    },
+    "tolerance": 0.0,
+    "description": "15 tool calls safety limit.",
+    "metadata": {
+      "plant_id": "63d2b0a1-ed00-44d4-97be-0afe76b6749f"
+    }
+  }
+]

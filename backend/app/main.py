@@ -17,6 +17,7 @@ from app.api.kpis import router as kpis_router
 from app.api.canonical_signals import router as canonical_signals_router
 from app.api.detectors import router as detectors_router
 from app.api.anomalies import router as anomalies_router
+from app.api.copilot import router as copilot_router
 from app.api.dev import router as dev_router
 from app.core.config import settings
 from app.db.session import create_db_engine, get_session_factory
@@ -73,6 +74,7 @@ app.include_router(ingestion_jobs_router)
 app.include_router(events_router)
 app.include_router(kpis_router)
 app.include_router(ai_router)
+app.include_router(copilot_router)
 app.include_router(dev_router)
 
 

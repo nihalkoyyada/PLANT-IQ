@@ -8,6 +8,8 @@ from app.models.entities import (
     AuditLog,
     CanonicalSignal,
     Channel,
+    ChartRecord,
+    Conversation,
     Detector,
     Event,
     File,
@@ -15,9 +17,11 @@ from app.models.entities import (
     JobHistory,
     KPIValue,
     MappingTemplate,
+    Message,
     Organization,
     Plant,
     Reading,
+    ToolCallRecord,
     User,
 )
 
@@ -41,4 +45,8 @@ __all__ = [
     "Reading",
     "JobHistory",
     "KPIValue",
+    "Conversation",
+    "Message",
+    "ToolCallRecord",
+    "ChartRecord",
 ]

@@ -56,7 +56,10 @@ def api_setup():
             db.commit()
             db.refresh(plant)
 
-        # Seed an anomaly
+        # Clear old test anomalies and seed fresh open anomaly
+        db.query(Anomaly).filter(Anomaly.plant_id == plant.id).delete()
+        db.commit()
+
         anomaly = Anomaly(
             plant_id=plant.id,
             start_time=datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc),
@@ -152,3 +155,17 @@ def test_triage_anomaly(client: TestClient, api_setup: dict):
     assert data["status"] == "acknowledged"
     assert data["status_note"] == "Investigating inverter DC disconnect switch."
     assert data["rca_narrative"]["root_cause"] == "Grid transient trip"
+
+
+def test_trigger_plant_anomaly_scan_endpoint(client: TestClient, api_setup: dict):
+    """Verify triggering a plant anomaly scan via API returns assets_scanned count."""
+    headers = {"Authorization": f"Bearer {api_setup['admin_token']}"}
+    plant_id = str(api_setup["plant_id"])
+
+    response = client.post(f"/anomalies/scan-plant/{plant_id}?window_hours=24", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "assets_scanned" in data
+    assert isinstance(data["assets_scanned"], int)
+    assert data["plant_id"] == plant_id

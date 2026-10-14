@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.models import Asset, Plant, User
-from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse
+from app.schemas.asset import AssetCreate, AssetUpdate, AssetResponse, AssetTreeNode
 from app.api.deps import get_current_user, require_role, enforce_org_access
 
 
@@ -85,6 +85,27 @@ def get_assets(
     )
 
     return result.scalars().all()
+
+
+@router.get(
+    "/tree",
+    response_model=list[AssetTreeNode],
+)
+def get_assets_tree(
+    plant_id: UUID | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve recursive asset hierarchy tree."""
+    from app.api.plants import get_plant_asset_tree
+    if plant_id is None:
+        first_plant = db.execute(
+            select(Plant).where(Plant.org_id == current_user.org_id).order_by(Plant.created_at.desc())
+        ).scalars().first()
+        if not first_plant:
+            return []
+        plant_id = first_plant.id
+    return get_plant_asset_tree(plant_id=plant_id, db=db, current_user=current_user)
 
 
 @router.get(
@@ -197,3 +218,4 @@ def delete_asset(
     db.delete(asset)
     db.commit()
     return None
+

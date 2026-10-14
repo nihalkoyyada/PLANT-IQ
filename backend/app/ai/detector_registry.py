@@ -183,6 +183,88 @@ class DetectorRegistry:
 register_detector = DetectorRegistry.register
 
 
+def get_effective_rated_kw(context: DetectorContext) -> float:
+    """Resolve realistic rated capacity for the asset, never defaulting an inverter to plant-wide capacity."""
+    if context.rated_kw is not None and float(context.rated_kw) > 0:
+        return float(context.rated_kw)
+    if context.metadata:
+        for k in ("rated_ac_kw", "rated_kw", "capacity_kw", "nominal_ac_kw"):
+            if k in context.metadata and context.metadata[k]:
+                return float(context.metadata[k])
+    if context.asset_type == "plant":
+        if context.capacity_dc_kwp is not None and float(context.capacity_dc_kwp) > 0:
+            return float(context.capacity_dc_kwp) * 0.90
+        return 25000.0
+    # For an inverter: default to 1000.0 kW (or realistic 1-inverter rating)
+    return 1000.0
+
+
+def integrate_power_deficit(
+    timestamps: Sequence[datetime],
+    actual_vals: Sequence[float],
+    expected_vals: Sequence[float],
+    cadence_seconds: int = 900,
+    max_gap_seconds: Optional[int] = None,
+    rated_kw: float = 1000.0,
+) -> Tuple[float, float, float]:
+    """Integrate power deficit over discrete intervals, protecting against long gaps.
+
+    Returns:
+        (peak_loss_kw, avg_loss_kw, total_loss_kwh)
+    """
+    if not timestamps or len(timestamps) != len(actual_vals) or len(timestamps) != len(expected_vals):
+        return 0.0, 0.0, 0.0
+
+    if max_gap_seconds is None:
+        max_gap_seconds = cadence_seconds * 2
+
+    peak_deficit_kw = 0.0
+    deficits = []
+    total_kwh = 0.0
+    total_active_seconds = 0.0
+
+    n = len(timestamps)
+    for i in range(n):
+        exp_v = expected_vals[i]
+        act_v = actual_vals[i]
+        if np.isnan(exp_v) or np.isnan(act_v) or exp_v <= 0.0:
+            deficits.append(0.0)
+            continue
+
+        # Deficit is positive when underperforming expected
+        deficit = max(0.0, exp_v - act_v)
+        # Cap instantaneous deficit by physical asset rating
+        deficit = min(deficit, rated_kw)
+        deficits.append(deficit)
+        if deficit > peak_deficit_kw:
+            peak_deficit_kw = deficit
+
+        # Determine interval duration dt for this sample
+        if i == 0:
+            dt = cadence_seconds
+        else:
+            step = (timestamps[i] - timestamps[i - 1]).total_seconds()
+            if step <= max_gap_seconds and step > 0:
+                dt = step
+            else:
+                # Long missing-data gap: do not interpolate across missing periods!
+                dt = 0.0
+
+        if dt > 0.0 and deficit > 0.0:
+            interval_hours = dt / 3600.0
+            interval_kwh = deficit * interval_hours
+            total_kwh += interval_kwh
+            total_active_seconds += dt
+
+    avg_deficit_kw = float(np.mean([d for d in deficits if d > 0])) if any(d > 0 for d in deficits) else 0.0
+
+    # Bound total energy loss by theoretical max possible for the asset over active duration
+    max_phys_kwh = rated_kw * (total_active_seconds / 3600.0) if total_active_seconds > 0 else 0.0
+    total_kwh = min(total_kwh, max_phys_kwh)
+
+    return round(peak_deficit_kw, 3), round(avg_deficit_kw, 3), round(total_kwh, 3)
+
+
 # =====================================================================
 # Built-in Algorithm: 1. D1: Statistical Outlier Detector ('d1_statistical', 'zscore', 'iqr')
 # =====================================================================
@@ -219,9 +301,7 @@ class D1StatisticalDetector(BaseDetector):
         threshold = float(parameters.get("threshold", parameters.get("z_threshold", 3.0)))
         k_iqr = float(parameters.get("k", parameters.get("multiplier", 1.5)))
 
-        rated_kw = float(context.rated_kw) if context.rated_kw is not None else (
-            float(context.capacity_dc_kwp) * 0.90 if context.capacity_dc_kwp is not None else 1000.0
-        )
+        rated_kw = get_effective_rated_kw(context)
         cadence_seconds = context.cadence_seconds
 
         ts_list = [obs[0] for obs in observations]
@@ -439,13 +519,22 @@ class D1StatisticalDetector(BaseDetector):
 
             avg_actual = float(np.mean(span_vals))
             avg_expected = float(np.mean([expected_baselines[i] for i in span]))
-            if avg_expected <= 0:
-                avg_expected = rated_kw * 0.80
+            if avg_expected < 0:
+                avg_expected = 0.0
 
+            span_ts = [ts_list[i] for i in span]
+            span_act = [val_arr[i] for i in span]
+            span_exp = [expected_baselines[i] for i in span]
+
+            peak_loss_kw, avg_loss_kw, loss_kwh = integrate_power_deficit(
+                timestamps=span_ts,
+                actual_vals=span_act,
+                expected_vals=span_exp,
+                cadence_seconds=cadence_seconds,
+                rated_kw=rated_kw,
+            )
             delta = avg_actual - avg_expected
-            loss_kw = max(0.0, avg_expected - avg_actual) if avg_actual < avg_expected else 0.0
-            hours = dur_mins / 60.0
-            loss_kwh = loss_kw * hours
+            loss_kw = min(peak_loss_kw, rated_kw)
 
             asset_label = context.asset_name or (str(context.asset_id)[:8] if context.asset_id else "Asset")
             subtype_str = "/".join(sorted(subtypes)) or mode
@@ -530,9 +619,7 @@ class D2PRDeviationDetector(BaseDetector):
         ts_list = [obs[0] for obs in observations]
         val_arr = np.array([float(obs[1]) for obs in observations], dtype=float)
 
-        rated_kw = float(context.rated_kw) if context.rated_kw is not None else (
-            float(context.capacity_dc_kwp) * 0.90 if context.capacity_dc_kwp is not None else 1000.0
-        )
+        rated_kw = get_effective_rated_kw(context)
         expected_pr = float(context.expected_pr) if context.expected_pr is not None else 0.80
 
         anom_indices: List[int] = []
@@ -553,14 +640,16 @@ class D2PRDeviationDetector(BaseDetector):
                     if not np.isnan(actual_val) and actual_val >= 0:
                         actual_pr = (actual_val / rated_kw) / (poa / 1000.0)
             else:
-                # Fallback: estimate from diurnal clear-sky envelope (06:00 to 18:00)
+                # Fallback: estimate from diurnal clear-sky envelope (06:00 to 18:30)
                 hour = ts.hour + (ts.minute / 60.0)
-                if 6.0 <= hour <= 18.0:
-                    solar_factor = math.sin((hour - 6.0) / 12.0 * math.pi)
+                if 6.0 <= hour <= 18.5:
+                    solar_factor = math.sin((hour - 6.0) / 12.5 * math.pi)
                     if solar_factor > 0.05:
                         expected_kw = rated_kw * 0.85 * solar_factor * expected_pr
                         if not np.isnan(actual_val) and actual_val >= 0 and expected_kw > 0:
                             actual_pr = (actual_val / expected_kw) * expected_pr
+                else:
+                    expected_kw = 0.0
 
             expected_series.append(expected_kw)
             actual_pr_series.append(actual_pr)
@@ -606,8 +695,19 @@ class D2PRDeviationDetector(BaseDetector):
 
             dur_mins = max(1, int((len(span) * cadence_seconds) / 60))
             hours = dur_mins / 60.0
-            loss_kw = avg_deficit
-            loss_kwh = loss_kw * hours
+
+            span_ts = [ts_list[i] for i in span]
+            span_act = [val_arr[i] for i in span]
+            span_exp = [expected_series[i] for i in span]
+
+            peak_loss_kw, avg_loss_kw, loss_kwh = integrate_power_deficit(
+                timestamps=span_ts,
+                actual_vals=span_act,
+                expected_vals=span_exp,
+                cadence_seconds=cadence_seconds,
+                rated_kw=rated_kw,
+            )
+            loss_kw = min(peak_loss_kw, rated_kw)
 
             avg_pr = float(np.mean(span_prs)) if span_prs else (
                 (avg_actual / avg_expected) * expected_pr if avg_expected > 0 else 0.0
@@ -798,9 +898,7 @@ class D3IrradianceResidualDetector(BaseDetector):
         latitude = float(context.latitude if context.latitude is not None else parameters.get("latitude", 14.1))
         longitude = float(context.longitude if context.longitude is not None else parameters.get("longitude", 77.3))
 
-        rated_kw = float(context.rated_kw if context.rated_kw is not None else (
-            float(context.capacity_dc_kwp) * 0.90 if context.capacity_dc_kwp is not None else 1000.0
-        ))
+        rated_kw = get_effective_rated_kw(context)
         expected_pr = float(context.expected_pr if context.expected_pr is not None else 0.80)
         cadence_seconds = context.cadence_seconds
 
@@ -961,8 +1059,18 @@ class D3IrradianceResidualDetector(BaseDetector):
             avg_deficit = float(np.mean(span_residuals))
             avg_rel_deficit = float(np.mean(span_rel_residuals))
 
-            loss_kw = max(0.0, avg_deficit)
-            loss_kwh = loss_kw * hours
+            span_ts = [ts_list[i] for i in span]
+            span_act = [val_arr[i] for i in span]
+            span_exp = [clearsky_baseline[i] for i in span]
+
+            peak_loss_kw, avg_loss_kw, loss_kwh = integrate_power_deficit(
+                timestamps=span_ts,
+                actual_vals=span_act,
+                expected_vals=span_exp,
+                cadence_seconds=cadence_seconds,
+                rated_kw=rated_kw,
+            )
+            loss_kw = min(peak_loss_kw, rated_kw)
 
             # Determine root-cause indicator
             has_sensor_obs = any(sensor_obstruction_mask[i] for i in span)
@@ -1090,7 +1198,7 @@ def extract_per_asset_telemetry_features(
     ts_list = [obs[0] for obs in observations]
     val_arr = np.array([float(obs[1]) for obs in observations], dtype=float)
 
-    rated_kw = float(context.rated_kw if context.rated_kw is not None else 1000.0)
+    rated_kw = get_effective_rated_kw(context)
     expected_pr = float(context.expected_pr if context.expected_pr is not None else 0.80)
     latitude = float(context.latitude if context.latitude is not None else 14.1)
     longitude = float(context.longitude if context.longitude is not None else 77.3)
@@ -1324,8 +1432,18 @@ class D4IsolationForestDetector(BaseDetector):
             if avg_expected <= 0:
                 avg_expected = float(np.median(val_arr[valid_mask]))
 
-            loss_kw = max(0.0, avg_expected - avg_actual)
-            loss_kwh = loss_kw * hours
+            span_ts = [ts_list[i] for i in span]
+            span_act = [val_arr[i] for i in span]
+            span_exp = [expected_baselines[i] for i in span]
+
+            peak_loss_kw, avg_loss_kw, loss_kwh = integrate_power_deficit(
+                timestamps=span_ts,
+                actual_vals=span_act,
+                expected_vals=span_exp,
+                cadence_seconds=cadence_seconds,
+                rated_kw=rated_kw,
+            )
+            loss_kw = min(peak_loss_kw, rated_kw)
             max_score = float(np.max(span_scores))
 
             # Root-cause diagnostic heuristic
@@ -1413,7 +1531,7 @@ class TripDetector(BaseDetector):
         min_midday_hour = int(parameters.get("start_hour", 8))
         max_midday_hour = int(parameters.get("end_hour", 17))
         cadence_seconds = context.cadence_seconds
-        rated_kw = float(context.rated_kw) if context.rated_kw is not None else 1000.0
+        rated_kw = get_effective_rated_kw(context)
 
         ts_list = [obs[0] for obs in observations]
         val_arr = np.array([float(obs[1]) for obs in observations], dtype=float)
@@ -1450,9 +1568,9 @@ class TripDetector(BaseDetector):
             start_ts = ts_list[span[0]]
             end_ts = ts_list[span[-1]]
             duration_minutes = int((len(span) * cadence_seconds) / 60)
-            loss_kw = rated_kw * 0.80  # Estimated generation expected during trip
+            loss_kw = min(rated_kw, rated_kw * 0.80)  # Estimated generation expected during trip
             hours = duration_minutes / 60.0
-            loss_kwh = loss_kw * hours
+            loss_kwh = min(rated_kw * hours, loss_kw * hours)
 
             asset_label = context.asset_name or (str(context.asset_id)[:8] if context.asset_id else "Asset")
             summary = (

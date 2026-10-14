@@ -353,7 +353,12 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
       </div>
 
       {/* Anomaly Alert Banner */}
-      {hasTelemetry && <AnomalyBanner onTriage={() => onNavigateTab && onNavigateTab('quality')} />}
+      {hasTelemetry && (
+        <AnomalyBanner
+          plantId={plant?.id}
+          onTriage={() => onNavigateTab && onNavigateTab('anomalies')}
+        />
+      )}
 
       {/* Main Content Area */}
       {activeTab === 'feed' ? (
@@ -398,9 +403,11 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
                           variant={
                             ev.severity === 'critical' || ev.severity === 'error'
                               ? 'rose'
-                              : ev.severity === 'warning'
+                              : ev.severity === 'high' || ev.severity === 'warning'
                               ? 'amber'
-                              : 'blue'
+                              : ev.severity === 'medium'
+                              ? 'blue'
+                              : 'slate'
                           }
                         >
                           {ev.severity.toUpperCase()}

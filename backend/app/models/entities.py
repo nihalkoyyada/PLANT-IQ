@@ -1197,3 +1197,153 @@ class AuditLog(Base):
     )
 
     user: Mapped[Optional["User"]] = relationship("User")
+
+
+class AlertRule(Base):
+    """Configurable alert rule for anomaly severity or KPI breach monitoring."""
+
+    __tablename__ = "alert_rules"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    metric: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    threshold: Mapped[float] = mapped_column(
+        Float().with_variant(DOUBLE_PRECISION, "postgresql"),
+        nullable=False,
+    )
+    direction: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    severity: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    channels: Mapped[List[str]] = mapped_column(
+        FlagsArray,
+        nullable=False,
+        default=list,
+        server_default="{}",
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+    )
+    config: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    plant: Mapped["Plant"] = relationship("Plant")
+
+    __table_args__ = (
+        CheckConstraint(
+            "direction IN ('above', 'below')",
+            name="ck_alert_rules_direction",
+        ),
+        CheckConstraint(
+            "severity IN ('info', 'warning', 'critical')",
+            name="ck_alert_rules_severity",
+        ),
+    )
+
+
+class AlertDelivery(Base):
+    """Audit log and dispatch record for alert notifications (email, webhook)."""
+
+    __tablename__ = "alert_deliveries"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    rule_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("alert_rules.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    anomaly_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("anomalies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    channel: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    recipient: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    dedup_key: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True,
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
+
+    rule: Mapped["AlertRule"] = relationship("AlertRule")
+    plant: Mapped["Plant"] = relationship("Plant")
+    anomaly: Mapped[Optional["Anomaly"]] = relationship("Anomaly")
+

@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.ai.anomaly_dedup import persist_and_deduplicate_anomalies
+from app.ai.anomaly_service import AnomalyCalculationService
 from app.ai.detector_registry import (
     BaseDetector,
     DetectedAnomaly,
@@ -60,6 +61,7 @@ def run_scheduled_anomaly_scans(
 
     total_scanned = 0
     total_anomalies = 0
+    total_assets_scanned = 0
     plant_summaries: List[Dict[str, Any]] = []
 
     with session_factory() as session:
@@ -72,11 +74,13 @@ def run_scheduled_anomaly_scans(
             )
             total_scanned += 1
             total_anomalies += summary.get("anomalies_detected", 0)
+            total_assets_scanned += summary.get("assets_scanned", 0)
             plant_summaries.append(summary)
 
     return {
         "status": "completed",
         "plants_scanned": total_scanned,
+        "assets_scanned": total_assets_scanned,
         "total_anomalies": total_anomalies,
         "details": plant_summaries,
     }
@@ -90,7 +94,7 @@ def execute_plant_anomaly_scan(
     """Core synchronization scan logic executing detectors and deduplicating results."""
     plant = db.get(Plant, plant_id)
     if plant is None:
-        return {"plant_id": str(plant_id), "status": "plant_not_found"}
+        return {"plant_id": str(plant_id), "status": "plant_not_found", "assets_scanned": 0}
 
     now_utc = datetime.now(timezone.utc)
     max_ts = db.execute(
@@ -156,6 +160,7 @@ def execute_plant_anomaly_scan(
     total_created = 0
     total_merged = 0
     detectors_run = 0
+    evaluated_asset_ids: set[UUID] = set()
 
     # 3. If no custom detectors defined, use default solar suite for all inverters
     if not detectors:
@@ -216,6 +221,8 @@ def execute_plant_anomaly_scan(
                     continue
 
                 observations = [(r.ts, float(r.value)) for r in readings]
+                inv_rated_kw = AnomalyCalculationService.resolve_asset_rated_kw(db, inv, plant)
+
                 context = DetectorContext(
                     plant_id=plant_id,
                     asset_id=inv.id,
@@ -224,7 +231,7 @@ def execute_plant_anomaly_scan(
                     plant_name=plant.name,
                     asset_name=inv.name,
                     asset_type="inverter",
-                    rated_kw=inv.rated_kw,
+                    rated_kw=inv_rated_kw,
                     capacity_dc_kwp=plant.capacity_dc_kwp,
                     expected_pr=plant.expected_pr or 0.80,
                     tariff_inr_per_kwh=plant.tariff_inr_per_kwh,
@@ -232,6 +239,8 @@ def execute_plant_anomaly_scan(
                     latitude=plant.latitude,
                     longitude=plant.longitude,
                 )
+
+                evaluated_asset_ids.add(inv.id)
 
                 candidates = detector_instance.detect(
                     observations=observations,
@@ -300,6 +309,8 @@ def execute_plant_anomaly_scan(
                     continue
 
                 observations = [(r.ts, float(r.value)) for r in readings]
+                asset_rated_kw = AnomalyCalculationService.resolve_asset_rated_kw(db, asset, plant)
+
                 context = DetectorContext(
                     plant_id=plant_id,
                     asset_id=asset.id,
@@ -308,7 +319,7 @@ def execute_plant_anomaly_scan(
                     plant_name=plant.name,
                     asset_name=asset.name,
                     asset_type=asset.asset_type,
-                    rated_kw=asset.rated_kw,
+                    rated_kw=asset_rated_kw,
                     capacity_dc_kwp=plant.capacity_dc_kwp,
                     expected_pr=plant.expected_pr or 0.80,
                     tariff_inr_per_kwh=plant.tariff_inr_per_kwh,
@@ -316,6 +327,8 @@ def execute_plant_anomaly_scan(
                     latitude=plant.latitude,
                     longitude=plant.longitude,
                 )
+
+                evaluated_asset_ids.add(asset.id)
 
                 candidates = detector_instance.detect(
                     observations=observations,
@@ -339,6 +352,7 @@ def execute_plant_anomaly_scan(
     return {
         "plant_id": str(plant_id),
         "status": "success",
+        "assets_scanned": len(evaluated_asset_ids),
         "detectors_evaluated": detectors_run,
         "anomalies_detected": total_detected,
         "anomalies_created": total_created,

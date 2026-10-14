@@ -386,3 +386,99 @@ def test_detectors_full_crud(client, crud_setup):
     # Delete detector
     del_res = client.delete(f"/detectors/{detector_id}", headers=headers)
     assert del_res.status_code == 204
+
+
+def test_plant_assets_tree_recursive_hierarchy(client, crud_setup):
+    """Regression test for S1-FS-04: GET /plants/{plant_id}/assets/tree recursive hierarchy."""
+    headers = crud_setup["admin_headers"]
+    plant_id = crud_setup["plant"].id
+
+    # 1. Create a Block asset (root, parent_id=None)
+    res_block = client.post(
+        "/assets",
+        json={
+            "plant_id": str(plant_id),
+            "name": "Block-A",
+            "asset_type": "block",
+        },
+        headers=headers,
+    )
+    assert res_block.status_code == 201
+    block_id = res_block.json()["id"]
+
+    # 2. Create an Inverter asset child of Block-A
+    res_inv = client.post(
+        "/assets",
+        json={
+            "plant_id": str(plant_id),
+            "name": "Inverter-01",
+            "asset_type": "inverter",
+            "parent_id": block_id,
+            "rated_kw": 1250.0,
+        },
+        headers=headers,
+    )
+    assert res_inv.status_code == 201
+    inv_id = res_inv.json()["id"]
+
+    # 3. Create a channel on Inverter-01
+    res_chan = client.post(
+        "/channels",
+        json={
+            "asset_id": inv_id,
+            "canonical_key": "power_ac",
+            "source_name": "INV01_PAC",
+            "receive_unit": "kW",
+            "interval_s": 900,
+        },
+        headers=headers,
+    )
+    assert res_chan.status_code == 201
+
+    # 4. Create a Weather Station asset (root, parent_id=None)
+    res_ws = client.post(
+        "/assets",
+        json={
+            "plant_id": str(plant_id),
+            "name": "Weather-01",
+            "asset_type": "weather_station",
+        },
+        headers=headers,
+    )
+    assert res_ws.status_code == 201
+    ws_id = res_ws.json()["id"]
+
+    # 5. Query GET /plants/{plant_id}/assets/tree
+    res_tree = client.get(f"/plants/{plant_id}/assets/tree", headers=headers)
+    assert res_tree.status_code == 200
+    tree_data = res_tree.json()
+    assert isinstance(tree_data, list)
+
+    # Roots should contain Block-A and Weather-01 (and any fixture root assets)
+    root_names = [node["name"] for node in tree_data]
+    assert "Block-A" in root_names
+    assert "Weather-01" in root_names
+
+    # Check Block-A node structure
+    block_node = next(node for node in tree_data if node["name"] == "Block-A")
+    assert block_node["asset_type"] == "block"
+    assert len(block_node["children"]) >= 1
+
+    # Check child Inverter-01
+    inv_node = next(child for child in block_node["children"] if child["name"] == "Inverter-01")
+    assert inv_node["asset_type"] == "inverter"
+    assert inv_node["parent_id"] == block_id
+    assert inv_node["rated_kw"] == 1250.0
+    assert len(inv_node["channels"]) >= 1
+    assert inv_node["channels"][0]["canonical_key"] == "power_ac"
+
+    # Check alias GET /assets/tree?plant_id={plant_id}
+    res_alias = client.get(f"/assets/tree?plant_id={plant_id}", headers=headers)
+    assert res_alias.status_code == 200
+    assert len(res_alias.json()) == len(tree_data)
+
+    # Tenant isolation: Other Org user cannot access plant asset tree
+    headers_other = crud_setup["org2_headers"]
+    res_forbidden = client.get(f"/plants/{plant_id}/assets/tree", headers=headers_other)
+    assert res_forbidden.status_code == 403
+

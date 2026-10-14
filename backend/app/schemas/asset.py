@@ -70,3 +70,27 @@ class AssetResponse(AssetBase):
         from_attributes=True,
         populate_by_name=True,
     )
+
+
+class AssetTreeNode(BaseModel):
+    id: UUID
+    plant_id: UUID
+    parent_id: UUID | None = None
+    name: str
+    asset_type: str
+    make: str | None = None
+    model: str | None = None
+    rated_kw: float | None = None
+    metadata: dict = Field(
+        default_factory=dict,
+        validation_alias="metadata_",
+        serialization_alias="metadata",
+    )
+    children: list["AssetTreeNode"] = Field(default_factory=list)
+    channels: list[dict] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+    )
+

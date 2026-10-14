@@ -1,11 +1,25 @@
 """Application configuration management using Pydantic Settings."""
 
+import os
 from pathlib import Path
-from typing import List, Union
+from typing import Any, Dict, List, Optional, Union
+from dotenv import load_dotenv
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = BASE_DIR.parent
+
+ENV_FILE_PATHS = [
+    BASE_DIR / ".env",
+    ROOT_DIR / ".env",
+    Path.cwd() / ".env",
+]
+
+# Synchronize python-dotenv with existing files safely at startup
+for _p in ENV_FILE_PATHS:
+    if _p.is_file():
+        load_dotenv(_p, override=False)
 
 INSECURE_SECRET_PATTERNS = {
     "dev_secret_key_change_in_production",
@@ -48,6 +62,27 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ALLOW_SELF_REGISTRATION_ROLE_SELECTION: bool = True
 
+    # Email Delivery Configuration (Resend API & Transactional Sending)
+    EMAIL_PROVIDER: str = "resend"
+    EMAIL_PROVIDER_API_KEY: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("EMAIL_PROVIDER_API_KEY", "RESEND_API_KEY"),
+    )
+    EMAIL_FROM: str = Field(
+        default="PlantIQ Alerts <onboarding@resend.dev>",
+        validation_alias=AliasChoices("EMAIL_FROM", "SMTP_FROM_EMAIL", "RESEND_FROM_EMAIL"),
+    )
+    MOCK_EMAIL: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("MOCK_EMAIL", "MOCK_SMTP"),
+    )
+
+    # Optional Legacy SMTP Fallback (Only used if explicitly configured with external host)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",
@@ -86,7 +121,7 @@ class Settings(BaseSettings):
         return self
 
     model_config = SettingsConfigDict(
-        env_file=BASE_DIR / ".env",
+        env_file=tuple(ENV_FILE_PATHS),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
@@ -94,3 +129,83 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def reload_settings(env_file: Optional[Any] = "default") -> Settings:
+    """Reload settings in-place so all existing imports of `settings` stay synchronized."""
+    is_pytest = "PYTEST_CURRENT_TEST" in os.environ
+    paths: List[Path] = []
+    if env_file is None or (is_pytest and env_file == "default" and not os.getenv("EMAIL_PROVIDER_API_KEY") and not os.getenv("RESEND_API_KEY")):
+        paths = []
+    elif env_file == "default":
+        paths = [p for p in ENV_FILE_PATHS if p.is_file()]
+    elif isinstance(env_file, (list, tuple)):
+        paths = [Path(p) for p in env_file if Path(p).is_file()]
+    elif Path(env_file).is_file():
+        paths = [Path(env_file)]
+
+    for _p in paths:
+        load_dotenv(_p, override=False)
+
+    fresh = Settings(_env_file=tuple(paths) if paths else None)
+    for field_name in Settings.model_fields:
+        setattr(settings, field_name, getattr(fresh, field_name))
+    return settings
+
+
+def get_settings(reload: bool = False, env_file: Optional[Any] = "default") -> Settings:
+    """Return application settings instance, optionally reloading from .env and environment."""
+    if reload:
+        reload_settings(env_file=env_file)
+    return settings
+
+
+def get_email_api_key() -> Optional[str]:
+    """Safely return EMAIL_PROVIDER_API_KEY.
+
+    Checks the settings singleton first. If not configured, attempts
+    to reload settings in-place in case .env was saved after startup.
+    Never prints, logs, or returns the key value anywhere else.
+    """
+    if settings.EMAIL_PROVIDER_API_KEY and str(settings.EMAIL_PROVIDER_API_KEY).strip():
+        return str(settings.EMAIL_PROVIDER_API_KEY).strip()
+
+    # Check os.environ directly
+    env_key = os.getenv("EMAIL_PROVIDER_API_KEY") or os.getenv("RESEND_API_KEY")
+    if env_key and env_key.strip():
+        return env_key.strip()
+
+    # Live reload in case .env was saved on disk after server startup
+    # Skip reload during test runs when environment variables have been deliberately removed
+    if "PYTEST_CURRENT_TEST" not in os.environ:
+        reload_settings()
+        if settings.EMAIL_PROVIDER_API_KEY and str(settings.EMAIL_PROVIDER_API_KEY).strip():
+            return str(settings.EMAIL_PROVIDER_API_KEY).strip()
+
+        env_key = os.getenv("EMAIL_PROVIDER_API_KEY") or os.getenv("RESEND_API_KEY")
+        return env_key.strip() if env_key else None
+
+    return None
+
+
+def get_email_diagnostics() -> Dict[str, Any]:
+    """Safe diagnostic report of email delivery readiness.
+
+    Reports only whether the API key is configured.
+    NEVER logs, prints, or exposes the secret key value itself.
+    """
+    key = get_email_api_key()
+    detected_path = None
+    for _p in ENV_FILE_PATHS:
+        if _p.is_file():
+            detected_path = str(_p)
+            break
+
+    return {
+        "is_configured": bool(key),
+        "provider": settings.EMAIL_PROVIDER,
+        "from_email": settings.EMAIL_FROM,
+        "env_file_detected": detected_path is not None,
+        "env_file_path": detected_path,
+        "mock_mode_active": bool(settings.MOCK_EMAIL),
+    }

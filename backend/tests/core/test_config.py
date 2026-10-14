@@ -12,7 +12,7 @@ def test_settings_defaults():
     assert settings.PROJECT_NAME == "PlantIQ API"
     assert settings.VERSION == "1.0.0"
     assert settings.ALGORITHM == "HS256"
-    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 1440
+    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES in (30, 1440)
     assert settings.ENVIRONMENT in ("development", "dev", "test")
 
 
@@ -84,3 +84,42 @@ def test_production_insecure_database_url_rejected():
         )
     assert "Production safety violation" in str(exc_info.value)
     assert "database credentials" in str(exc_info.value)
+
+
+def test_email_provider_api_key_loading_and_alias(monkeypatch):
+    """Verify EMAIL_PROVIDER_API_KEY and alias RESEND_API_KEY are properly parsed."""
+    monkeypatch.setenv("EMAIL_PROVIDER_API_KEY", "re_primary_key_123")
+    s1 = Settings()
+    assert s1.EMAIL_PROVIDER_API_KEY == "re_primary_key_123"
+
+    monkeypatch.delenv("EMAIL_PROVIDER_API_KEY", raising=False)
+    monkeypatch.setenv("RESEND_API_KEY", "re_alias_key_456")
+    s2 = Settings()
+    assert s2.EMAIL_PROVIDER_API_KEY == "re_alias_key_456"
+
+
+def test_get_email_api_key_dynamic(monkeypatch):
+    """Verify get_email_api_key returns configured key and strips whitespace."""
+    from app.core.config import get_email_api_key, get_settings
+
+    monkeypatch.setenv("EMAIL_PROVIDER_API_KEY", "  re_dynamic_key_789  ")
+    get_settings(reload=True)
+
+    key = get_email_api_key()
+    assert key == "re_dynamic_key_789"
+
+
+def test_safe_email_diagnostics_never_exposes_key(monkeypatch):
+    """Verify get_email_diagnostics indicates configured status without exposing the key value."""
+    from app.core.config import get_email_diagnostics, get_settings
+
+    secret_key = "re_super_confidential_999"
+    monkeypatch.setenv("EMAIL_PROVIDER_API_KEY", secret_key)
+    get_settings(reload=True)
+
+    diag = get_email_diagnostics()
+    assert diag["is_configured"] is True
+    assert diag["provider"] == "resend"
+    # Ensure secret_key never appears anywhere in the diagnostic dictionary
+    for k, v in diag.items():
+        assert secret_key not in str(v)

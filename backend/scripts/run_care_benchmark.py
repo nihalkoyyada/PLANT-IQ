@@ -57,7 +57,11 @@ DEFAULT_DATASET = Path(_repo_dir) / "Datasets" / "Surya-A-demo.csv"
 DEFAULT_GROUND_TRUTH = Path(_repo_dir) / "Datasets" / "ground_truth_anomalies.json"
 DEFAULT_WEATHER = Path(_repo_dir) / "Datasets" / "Plant_1_Weather_Sensor_Data.csv"
 DEFAULT_MARKDOWN_DOCS = Path(_repo_dir) / "docs" / "care-benchmark-report.md"
-DEFAULT_ARTIFACT_DIR = Path("/home/stpl/.gemini/antigravity-ide/brain/34cecd50-bdfe-4733-abec-d839b80f65ee")
+DEFAULT_ARTIFACT_DIR = Path(
+    os.getenv("ARTIFACT_DIR")
+    or os.getenv("GEMINI_ARTIFACT_DIR")
+    or (Path(_repo_dir) / "docs")
+)
 
 
 def _format_lead_time(minutes: float) -> str:
@@ -123,7 +127,7 @@ def main(
     tariff_inr: float = typer.Option(
         4.20,
         "--tariff",
-        help="Feed-in tariff rate in INR (₹) per kWh for loss calculation",
+        help="Feed-in tariff rate in INR per kWh for loss calculation",
     ),
 ) -> None:
     """Execute the CARE Benchmark Harness across solar anomaly detectors."""

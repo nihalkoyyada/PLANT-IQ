@@ -291,19 +291,25 @@ def test_severity_policy_classification():
     """Verify SeverityPolicy classifies into standard tiers ('low', 'medium', 'high', 'critical')."""
     # 1. Critical
     assert SeverityPolicy.evaluate(anomaly_type="trip") == "critical"
-    assert SeverityPolicy.evaluate(loss_kw=150.0) == "critical"
-    assert SeverityPolicy.evaluate(loss_kw=30.0, score=0.92) == "critical"
+    assert SeverityPolicy.evaluate(loss_kw=600.0, duration_minutes=30, rated_kw=1000.0) == "critical"
+    assert SeverityPolicy.evaluate(loss_kwh=350.0) == "critical"
+
+    # Confidence score alone must not elevate minor deviation to Critical
+    assert SeverityPolicy.evaluate(loss_kw=30.0, score=0.95, rated_kw=1000.0) != "critical"
 
     # 2. High
-    assert SeverityPolicy.evaluate(loss_kw=40.0) == "high"
-    assert SeverityPolicy.evaluate(deficit_pct=0.40, duration_minutes=60) == "high"
+    assert SeverityPolicy.evaluate(deficit_pct=0.25, duration_minutes=35) == "high"
+    assert SeverityPolicy.evaluate(loss_kwh=40.0, deficit_pct=0.06) == "high"
 
     # 3. Medium
-    assert SeverityPolicy.evaluate(loss_kw=12.0) == "medium"
-    assert SeverityPolicy.evaluate(anomaly_type="flatline") == "medium"
+    assert SeverityPolicy.evaluate(deficit_pct=0.10, duration_minutes=20) == "medium"
+    assert SeverityPolicy.evaluate(loss_kwh=15.0, deficit_pct=0.03) == "medium"
+    assert SeverityPolicy.evaluate(anomaly_type="flatline", loss_kw=20.0) == "medium"
 
     # 4. Low
     assert SeverityPolicy.evaluate(loss_kw=2.0, deficit_pct=0.05, score=0.30) == "low"
+    assert SeverityPolicy.evaluate(loss_kwh=2.0) == "low"
+
 
 
 def test_financial_loss_policy_calculation():

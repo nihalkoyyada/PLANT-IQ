@@ -3,6 +3,8 @@
 from app.models.base import Base, TimestampMixin, generate_uuid
 
 from app.models.entities import (
+    AlertDelivery,
+    AlertRule,
     Anomaly,
     Asset,
     AuditLog,
@@ -31,6 +33,8 @@ __all__ = [
     "Asset",
     "AuditLog",
     "Anomaly",
+    "AlertRule",
+    "AlertDelivery",
     "CanonicalSignal",
     "Channel",
     "Detector",
@@ -41,4 +45,4 @@ __all__ = [
     "Reading",
     "JobHistory",
     "KPIValue",
-]
+]

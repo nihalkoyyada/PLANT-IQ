@@ -11,6 +11,7 @@ import { DevicesPage } from './pages/DevicesPage';
 import { TelemetryPage } from './pages/TelemetryPage';
 import { IngestionPage } from './pages/IngestionPage';
 import { DataQualityPage } from './pages/DataQualityPage';
+import { AnomaliesPage } from './pages/AnomaliesPage';
 import { getPlants } from './api/plants';
 import { Plant } from './types';
 import { Activity, Loader2 } from 'lucide-react';
@@ -117,6 +118,7 @@ function AppContent() {
           {activeTab === 'plants' && <PlantsPage />}
           {activeTab === 'devices' && <DevicesPage />}
           {activeTab === 'telemetry' && <TelemetryPage />}
+          {activeTab === 'anomalies' && <AnomaliesPage />}
           {activeTab === 'ingestion' && canAccessUpload && <IngestionPage />}
           {activeTab === 'quality' && <DataQualityPage />}
         </main>

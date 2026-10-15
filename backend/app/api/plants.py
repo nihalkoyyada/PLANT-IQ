@@ -5,8 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models import Plant, Organization, User
+from app.models import Plant, Organization, User, Asset, Channel
 from app.schemas.plant import PlantCreate, PlantUpdate, PlantResponse
+from app.schemas.asset import AssetTreeNode
 from app.api.deps import get_current_user, require_role, enforce_org_access
 
 
@@ -172,3 +173,70 @@ def delete_plant(
     db.delete(plant)
     db.commit()
     return None
+
+
+@router.get(
+    "/{plant_id}/assets/tree",
+    response_model=list[AssetTreeNode],
+)
+def get_plant_asset_tree(
+    plant_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve full recursive asset hierarchy tree for a plant."""
+    plant = db.get(Plant, plant_id)
+    if plant is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plant not found",
+        )
+
+    enforce_org_access(current_user, plant.org_id)
+
+    assets = db.execute(
+        select(Asset).where(Asset.plant_id == plant.id).order_by(Asset.name)
+    ).scalars().all()
+
+    asset_ids = [a.id for a in assets]
+    channels = db.execute(
+        select(Channel).where(Channel.asset_id.in_(asset_ids))
+    ).scalars().all() if asset_ids else []
+
+    channels_by_asset: dict[UUID, list[dict]] = {}
+    for ch in channels:
+        channels_by_asset.setdefault(ch.asset_id, []).append({
+            "id": str(ch.id),
+            "canonical_key": ch.canonical_key,
+            "source_name": ch.source_name,
+            "receive_unit": ch.receive_unit,
+            "interval_s": ch.interval_s,
+            "agg_semantics": ch.agg_semantics,
+        })
+
+    nodes: dict[UUID, dict] = {}
+    for a in assets:
+        nodes[a.id] = {
+            "id": a.id,
+            "plant_id": a.plant_id,
+            "parent_id": a.parent_id,
+            "name": a.name,
+            "asset_type": a.asset_type,
+            "make": a.make,
+            "model": a.model,
+            "rated_kw": float(a.rated_kw) if a.rated_kw is not None else None,
+            "metadata": a.metadata_ or {},
+            "children": [],
+            "channels": channels_by_asset.get(a.id, []),
+        }
+
+    roots: list[dict] = []
+    for a in assets:
+        node = nodes[a.id]
+        if a.parent_id and a.parent_id in nodes:
+            nodes[a.parent_id]["children"].append(node)
+        else:
+            roots.append(node)
+
+    return roots
+

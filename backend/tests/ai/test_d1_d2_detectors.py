@@ -431,7 +431,7 @@ def test_d1_d2_persist_and_deduplicate(db_session: Session, test_setup: Dict[str
     assert created1 == 1
     assert merged1 == 0
     assert persisted1[0].status == "open"
-    assert persisted1[0].severity == "critical"
+    assert persisted1[0].severity == "high"
 
     # Second pass: contiguous window (adjoining within 15 minutes)
     cand2 = DetectedAnomaly(

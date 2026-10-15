@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 from typing import Optional, List, Tuple, Dict
 
@@ -8,7 +8,7 @@ from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.models import Plant, Asset, Channel, Reading, User
+from app.models import Plant, Asset, Channel, Reading, User, KPIValue
 from app.schemas.kpi import (
     PRHeatmapCell,
     PRHeatmapRow,
@@ -766,3 +766,56 @@ def get_top_losers(
         ranking_mode=ranking_mode,
         losers=losers,
     )
+
+
+@router.get(
+    "/{plant_id}/kpis/daily",
+    tags=["KPIs & Loss Analysis"],
+)
+@router.get(
+    "/{plant_id}/kpis",
+    tags=["KPIs & Loss Analysis"],
+)
+def get_daily_kpis(
+    plant_id: UUID,
+    target_date: Optional[date] = Query(default=None, alias="date"),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retrieve daily KPI rollups for a plant from TimescaleDB kpi_values."""
+    plant = db.get(Plant, plant_id)
+    if plant is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found")
+    enforce_org_access(current_user, plant.org_id)
+
+    query = select(KPIValue).where(
+        KPIValue.plant_id == plant.id,
+        KPIValue.period == "day",
+    )
+    if target_date is not None:
+        query = query.where(func.date(KPIValue.time) == target_date)
+    else:
+        if start_date is not None:
+            query = query.where(func.date(KPIValue.time) >= start_date)
+        if end_date is not None:
+            query = query.where(func.date(KPIValue.time) <= end_date)
+
+    query = query.order_by(KPIValue.time.desc())
+    records = db.execute(query).scalars().all()
+
+    return [
+        {
+            "time": r.time.isoformat(),
+            "plant_id": str(r.plant_id),
+            "asset_id": str(r.asset_id) if r.asset_id else None,
+            "kpi_key": r.kpi_key,
+            "period": r.period,
+            "value": r.value,
+            "coverage": float(r.coverage),
+            "flags": r.flags or [],
+        }
+        for r in records
+    ]
+

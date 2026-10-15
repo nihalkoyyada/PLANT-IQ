@@ -211,9 +211,7 @@ export const TopLosers: React.FC<TopLosersProps> = ({ data, loading }) => {
                 <th className="py-2.5 px-3 font-semibold">Inverter / Asset</th>
                 <th className="py-2.5 px-3 font-semibold text-right">Expected (MWh)</th>
                 <th className="py-2.5 px-3 font-semibold text-right">Actual (MWh)</th>
-                <th className="py-2.5 px-3 font-semibold text-right">
-                  {hasPoa ? 'Inverter Deficit' : 'Generation'}
-                </th>
+                <th className="py-2.5 px-3 font-semibold text-right">Inverter Deficit</th>
                 <th className="py-2.5 px-3 font-semibold text-right">Deficit %</th>
                 <th
                   className="py-2.5 px-3 font-semibold text-center cursor-help"
@@ -260,13 +258,15 @@ export const TopLosers: React.FC<TopLosersProps> = ({ data, loading }) => {
                   </td>
                   <td className="py-2.5 px-3 text-right text-emerald-700 font-medium">{item.actual_mwh} MWh</td>
                   <td className="py-2.5 px-3 text-right text-rose-600 font-bold">
-                    {item.loss_mwh !== null && item.loss_mwh !== undefined && item.loss_mwh > 0 ? (
+                    {hasPoa && item.loss_mwh !== null && item.loss_mwh !== undefined && item.loss_mwh > 0 ? (
                       <div className="flex items-center justify-end gap-1">
                         <ArrowDownRight className="w-3.5 h-3.5" />
                         <span>{item.loss_mwh} MWh</span>
                       </div>
-                    ) : (
+                    ) : hasPoa ? (
                       <span className="text-emerald-600 font-normal">0.00 MWh</span>
+                    ) : (
+                      <span className="text-slate-400 font-normal">N/A</span>
                     )}
                   </td>
                   <td className="py-2.5 px-3 text-right text-rose-600 font-bold">

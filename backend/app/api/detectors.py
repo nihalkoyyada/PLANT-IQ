@@ -219,6 +219,7 @@ def run_detector(
     total_detected = 0
     total_created = 0
     total_merged = 0
+    evaluated_asset_ids: set[UUID] = set()
 
     for asset in assets:
         channel = (
@@ -264,6 +265,8 @@ def run_detector(
             tariff_inr_per_kwh=detector.plant.tariff_inr_per_kwh,
         )
 
+        evaluated_asset_ids.add(asset.id)
+
         candidates = detector_instance.detect(
             observations=observations,
             parameters=detector.parameters or {},
@@ -286,7 +289,7 @@ def run_detector(
         "detector_name": detector.name,
         "method": detector.method,
         "status": "success",
-        "assets_scanned": len(assets),
+        "assets_scanned": len(evaluated_asset_ids),
         "anomalies_detected": total_detected,
         "anomalies_created": total_created,
         "anomalies_merged": total_merged,

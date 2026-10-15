@@ -328,3 +328,143 @@ export interface Detector {
   enabled: boolean;
   created_at: string;
 }
+
+export type AnomalySeverity = 'low' | 'medium' | 'high' | 'critical';
+export type AnomalyStatus = 'open' | 'acknowledged' | 'resolved' | 'false_positive';
+
+export interface Anomaly {
+  id: string;
+  plant_id: string;
+  plant_name?: string | null;
+  asset_id?: string | null;
+  asset_name?: string | null;
+  channel_id?: string | null;
+  channel_name?: string | null;
+  detector_id?: string | null;
+  detector_name?: string | null;
+  start_time: string;
+  end_time?: string | null;
+  source: string;
+  score: number;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  estimated_loss_kw?: number | null;
+  summary?: string | null;
+  details: Record<string, any>;
+  rca_narrative?: Record<string, any> | null;
+  rca_by?: string | null;
+  status_note?: string | null;
+  created_at: string;
+}
+
+export interface AnomalySummary {
+  total_anomalies: number;
+  open_count: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  low_count: number;
+  total_estimated_loss_kwh: number;
+  total_estimated_financial_loss_inr: number;
+}
+
+export interface BulkAnomalyTriageRequest {
+  anomaly_ids: string[];
+  status: AnomalyStatus;
+  status_note?: string;
+}
+
+export interface BulkAnomalyTriageResponse {
+  updated_count: number;
+  status: string;
+  anomaly_ids: string[];
+}
+
+export interface AnomalyEvidenceDataPoint {
+  ts: string;
+  observed?: number | null;
+  baseline?: number | null;
+  upper_bound?: number | null;
+  lower_bound?: number | null;
+  is_anomaly: boolean;
+}
+
+export interface AnomalyHypothesis {
+  rank: number;
+  hypothesis: string;
+  confidence: number;
+  category: string;
+  description: string;
+}
+
+export interface AnomalySupportingEvidence {
+  label: string;
+  value: string;
+  status: string;
+  type: string;
+}
+
+export interface AnomalyEvidenceResponse {
+  anomaly_id: string;
+  plant_id: string;
+  plant_name?: string | null;
+  asset_id?: string | null;
+  asset_name?: string | null;
+  channel_id?: string | null;
+  canonical_key?: string | null;
+  detector_name?: string | null;
+  detector_method?: string | null;
+  observed_value?: number | null;
+  baseline_value?: number | null;
+  threshold_value?: number | null;
+  unit: string;
+  severity: AnomalySeverity;
+  status: AnomalyStatus;
+  status_note?: string | null;
+  estimated_loss_kw?: number | null;
+  estimated_loss_kwh?: number | null;
+  estimated_loss_inr?: number | null;
+  start_time: string;
+  end_time?: string | null;
+  data_points: AnomalyEvidenceDataPoint[];
+  rca_narrative?: Record<string, any> | null;
+  supporting_evidence: AnomalySupportingEvidence[];
+  recommended_checks: string[];
+  ranked_hypotheses: AnomalyHypothesis[];
+}
+
+export interface AlertRule {
+  id: string;
+  plant_id: string;
+  plant_name?: string | null;
+  name: string;
+  metric: string;
+  threshold: number;
+  direction: 'above' | 'below';
+  severity: 'info' | 'warning' | 'critical';
+  channels: ('email' | 'webhook')[];
+  enabled: boolean;
+  config: {
+    recipients?: string[];
+    webhook_url?: string;
+    webhook_secret?: string;
+    smtp_host?: string;
+    [key: string]: any;
+  };
+  created_at: string;
+}
+
+export interface AlertDelivery {
+  id: string;
+  rule_id: string;
+  plant_id: string;
+  anomaly_id?: string | null;
+  channel: string;
+  recipient: string;
+  status: 'accepted' | 'delivered' | 'failed' | 'simulated' | string;
+  attempt_count: number;
+  payload: Record<string, any>;
+  error_message?: string | null;
+  created_at: string;
+}
+

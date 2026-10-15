@@ -29,10 +29,12 @@ from pathlib import Path
 import sys
 from typing import Any, Dict, List, Optional
 
-# Ensure project root is in sys.path for direct script execution
+# Ensure backend and repository roots are in sys.path for direct script execution
+_backend_dir = str(Path(__file__).resolve().parent.parent)
 _project_root = str(Path(__file__).resolve().parent.parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
+for p in [_backend_dir, _project_root]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 import httpx
 from rich.console import Console
@@ -40,20 +42,36 @@ from rich.panel import Panel
 from rich.table import Table
 import typer
 
-from backend.app.llm.anthropic import DEFAULT_ANTHROPIC_MODEL
-from backend.app.llm.exceptions import ProviderError
-from backend.app.llm.factory import get_llm_provider
-from backend.app.llm.hooks import InMemoryUsageRecorder
-from backend.app.llm.openai_compatible import (
-    DEFAULT_OPENAI_COMPATIBLE_URL,
-    DEFAULT_OPENAI_MODEL,
-)
-from backend.app.llm.types import (
-    Message,
-    ProviderResponse,
-    ToolDefinition,
-    ToolUseBlock,
-)
+try:
+    from app.llm.anthropic import DEFAULT_ANTHROPIC_MODEL
+    from app.llm.exceptions import ProviderError
+    from app.llm.factory import get_llm_provider
+    from app.llm.hooks import InMemoryUsageRecorder
+    from app.llm.openai_compatible import (
+        DEFAULT_OPENAI_COMPATIBLE_URL,
+        DEFAULT_OPENAI_MODEL,
+    )
+    from app.llm.types import (
+        Message,
+        ProviderResponse,
+        ToolDefinition,
+        ToolUseBlock,
+    )
+except ImportError:
+    from backend.app.llm.anthropic import DEFAULT_ANTHROPIC_MODEL
+    from backend.app.llm.exceptions import ProviderError
+    from backend.app.llm.factory import get_llm_provider
+    from backend.app.llm.hooks import InMemoryUsageRecorder
+    from backend.app.llm.openai_compatible import (
+        DEFAULT_OPENAI_COMPATIBLE_URL,
+        DEFAULT_OPENAI_MODEL,
+    )
+    from backend.app.llm.types import (
+        Message,
+        ProviderResponse,
+        ToolDefinition,
+        ToolUseBlock,
+    )
 
 app = typer.Typer(
     name="smoke-tooluse",

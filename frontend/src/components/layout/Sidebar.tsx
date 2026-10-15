@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { getQCStats } from '../../api/readings';
 
-export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'ingestion' | 'quality';
+export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'anomalies' | 'ingestion' | 'quality';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -37,9 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     { id: 'plants', label: 'Plants', icon: Sun },
     { id: 'devices', label: 'Devices / Inverters', icon: Cpu },
     { id: 'telemetry', label: 'Telemetry Explorer', icon: LineChart },
+    { id: 'anomalies', label: 'Anomaly Inbox', icon: ShieldAlert },
     ...(canAccessUpload ? [{ id: 'ingestion', label: 'Upload & Mapping', icon: UploadCloud }] : []),
     { id: 'quality', label: 'Data Quality & QC', icon: CheckCircle2 },
   ] as const;
+
 
   return (
     <aside className="hidden md:flex flex-col w-60 bg-white border-r border-slate-200/80 min-h-[calc(100vh-53px)] p-3 space-y-6">

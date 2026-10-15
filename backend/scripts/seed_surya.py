@@ -16,7 +16,17 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 import hashlib
 import os
+from pathlib import Path
+import sys
 from typing import Any, Dict, List, Optional
+
+# Ensure backend and repository roots are in sys.path for direct CLI execution
+_backend_dir = str(Path(__file__).resolve().parent.parent)
+_repo_dir = str(Path(__file__).resolve().parent.parent.parent)
+for p in [_backend_dir, _repo_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 import typer

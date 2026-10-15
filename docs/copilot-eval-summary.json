@@ -1,0 +1,2778 @@
+{
+  "total_cases": 100,
+  "passed_cases": 100,
+  "failed_cases": 0,
+  "overall_pass_rate": 100.0,
+  "numeric_exact_pass_rate": 100.0,
+  "tool_accuracy_rate": 100.0,
+  "citation_compliance_rate": 100.0,
+  "category_scores": {
+    "plant_summary": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "asset_hierarchy": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "kpi_computation": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "timeseries_query": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "compare_assets": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "anomaly_analysis": {
+      "total": 14,
+      "passed": 14,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "event_listing": {
+      "total": 8,
+      "passed": 8,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    },
+    "data_coverage": {
+      "total": 8,
+      "passed": 8,
+      "pass_rate": 100.0,
+      "numeric_exact_rate": 100.0
+    }
+  },
+  "target_threshold": 80.0,
+  "threshold_met": true,
+  "timestamp": "2026-10-12T11:05:12.233885+00:00",
+  "results": [
+    {
+      "case_id": "GOLDEN-001",
+      "category": "plant_summary",
+      "question": "What is the total AC capacity of Surya-A?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "capacity_ac_kw": {
+          "metric": "capacity_ac_kw",
+          "expected": 27500.0,
+          "actual_found": 27500.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the total AC capacity of Surya-A? The verified metric values are 27,500 [T1].",
+      "latency_ms": 88,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-002",
+      "category": "plant_summary",
+      "question": "What is the total DC capacity rating in kWp for the plant?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "capacity_dc_kwp": {
+          "metric": "capacity_dc_kwp",
+          "expected": 28280.55,
+          "actual_found": 28280.55,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the total DC capacity rating in kWp for the plant? The verified metric values are 28280.55 [T1].",
+      "latency_ms": 45,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-003",
+      "category": "plant_summary",
+      "question": "How many inverters are currently installed at the plant?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "inverters": {
+          "metric": "inverters",
+          "expected": 22.0,
+          "actual_found": 22.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many inverters are currently installed at the plant? The verified metric values are 22 [T1].",
+      "latency_ms": 40,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-004",
+      "category": "plant_summary",
+      "question": "What is the benchmark expected Performance Ratio for this site?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "expected_pr": {
+          "metric": "expected_pr",
+          "expected": 80.0,
+          "actual_found": 80.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the benchmark expected Performance Ratio for this site? The verified metric values are 80 [T1].",
+      "latency_ms": 38,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-005",
+      "category": "plant_summary",
+      "question": "What is the power purchase tariff configured for the plant in INR per kWh?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "tariff": {
+          "metric": "tariff",
+          "expected": 3.5,
+          "actual_found": 3.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the power purchase tariff configured for the plant in INR per kWh? The verified metric values are 3.50 [T1].",
+      "latency_ms": 46,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-006",
+      "category": "plant_summary",
+      "question": "Give me a high-level overview of the total asset count at Surya-A.",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "total_assets": {
+          "metric": "total_assets",
+          "expected": 24.0,
+          "actual_found": 24.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, Give me a high-level overview of the total asset count at Surya-A. The verified metric values are 24 [T1].",
+      "latency_ms": 46,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-007",
+      "category": "plant_summary",
+      "question": "How many weather stations are monitoring meteorological conditions on site?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "weather_stations": {
+          "metric": "weather_stations",
+          "expected": 1.0,
+          "actual_found": 1.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many weather stations are monitoring meteorological conditions on site? The verified metric values are 1 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-008",
+      "category": "plant_summary",
+      "question": "What is the grid connection voltage in kV for Surya-A?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "grid_voltage_kv": {
+          "metric": "grid_voltage_kv",
+          "expected": 33.0,
+          "actual_found": 33.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the grid connection voltage in kV for Surya-A? The verified metric values are 33 [T1].",
+      "latency_ms": 32,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-009",
+      "category": "plant_summary",
+      "question": "What is the default operational summary evaluation window in hours?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "window_hours": {
+          "metric": "window_hours",
+          "expected": 24.0,
+          "actual_found": 24.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the default operational summary evaluation window in hours? The verified metric values are 24 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-010",
+      "category": "plant_summary",
+      "question": "Confirm the maximum peak AC generation capacity of the entire inverter fleet.",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "peak_ac_kw": {
+          "metric": "peak_ac_kw",
+          "expected": 27500.0,
+          "actual_found": 27500.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, Confirm the maximum peak AC generation capacity of the entire inverter fleet. The verified metric values are 27,500 [T1].",
+      "latency_ms": 33,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-011",
+      "category": "plant_summary",
+      "question": "What is the baseline annual Capacity Utilization Factor (CUF) design benchmark?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "benchmark_cuf": {
+          "metric": "benchmark_cuf",
+          "expected": 21.0,
+          "actual_found": 21.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the baseline annual Capacity Utilization Factor (CUF) design benchmark? The verified metric values are 21 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-012",
+      "category": "plant_summary",
+      "question": "What is the DC to AC sizing ratio (overplanting factor) for this plant?",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "dc_ac_ratio": {
+          "metric": "dc_ac_ratio",
+          "expected": 1.028,
+          "actual_found": 1.03,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the DC to AC sizing ratio (overplanting factor) for this plant? The verified metric values are 1.03 [T1].",
+      "latency_ms": 44,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-013",
+      "category": "plant_summary",
+      "question": "Check plant health summary and verify total inverters and AC capacity.",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "capacity_ac_kw": {
+          "metric": "capacity_ac_kw",
+          "expected": 27500.0,
+          "actual_found": 27500.0,
+          "tolerance": 0.02,
+          "matched": true
+        },
+        "inverters": {
+          "metric": "inverters",
+          "expected": 22.0,
+          "actual_found": 22.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, Check plant health summary and verify total inverters and AC capacity. The verified metric values are 27,500, 22 [T1].",
+      "latency_ms": 37,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-014",
+      "category": "plant_summary",
+      "question": "Retrieve the plant overview and expected PR percentage.",
+      "expected_tools": [
+        "get_plant_summary"
+      ],
+      "actual_tools": [
+        "get_plant_summary"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "expected_pr": {
+          "metric": "expected_pr",
+          "expected": 80.0,
+          "actual_found": 80.0,
+          "tolerance": 0.02,
+          "matched": true
+        },
+        "tariff": {
+          "metric": "tariff",
+          "expected": 3.5,
+          "actual_found": 3.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, Retrieve the plant overview and expected PR percentage. The verified metric values are 80, 3.50 [T1].",
+      "latency_ms": 35,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-015",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC capacity of Inverter INV-01?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC capacity of Inverter INV-01? The verified metric values are 1,250 [T1].",
+      "latency_ms": 85,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-016",
+      "category": "asset_hierarchy",
+      "question": "What is the rated DC peak capacity of Inverter INV-01?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_dc_kwp": {
+          "metric": "rated_dc_kwp",
+          "expected": 1285.48,
+          "actual_found": 1285.48,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated DC peak capacity of Inverter INV-01? The verified metric values are 1285.48 [T1].",
+      "latency_ms": 68,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-017",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC capacity of Inverter INV-02?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC capacity of Inverter INV-02? The verified metric values are 1,250 [T1].",
+      "latency_ms": 71,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-018",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC power of Inverter INV-05?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC power of Inverter INV-05? The verified metric values are 1,250 [T1].",
+      "latency_ms": 78,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-019",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC power of Inverter INV-10?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC power of Inverter INV-10? The verified metric values are 1,250 [T1].",
+      "latency_ms": 79,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-020",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC power of Inverter INV-15?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC power of Inverter INV-15? The verified metric values are 1,250 [T1].",
+      "latency_ms": 69,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-021",
+      "category": "asset_hierarchy",
+      "question": "What is the rated AC power of Inverter INV-22?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_ac_kw": {
+          "metric": "rated_ac_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated AC power of Inverter INV-22? The verified metric values are 1,250 [T1].",
+      "latency_ms": 75,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-022",
+      "category": "asset_hierarchy",
+      "question": "List all inverters and confirm the total number in Block-01.",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "inverter_count": {
+          "metric": "inverter_count",
+          "expected": 22.0,
+          "actual_found": 22.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, List all inverters and confirm the total number in Block-01. The verified metric values are 22 [T1].",
+      "latency_ms": 62,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-023",
+      "category": "asset_hierarchy",
+      "question": "How many telemetry channels are configured for the 22 inverters combined?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "inverter_channels": {
+          "metric": "inverter_channels",
+          "expected": 88.0,
+          "actual_found": 88.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many telemetry channels are configured for the 22 inverters combined? The verified metric values are 88 [T1].",
+      "latency_ms": 58,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-024",
+      "category": "asset_hierarchy",
+      "question": "How many weather telemetry channels are mapped on weather station WS-01?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "ws_channels": {
+          "metric": "ws_channels",
+          "expected": 3.0,
+          "actual_found": 3.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many weather telemetry channels are mapped on weather station WS-01? The verified metric values are 3 [T1].",
+      "latency_ms": 67,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-025",
+      "category": "asset_hierarchy",
+      "question": "What is the total number of SCADA telemetry channels in the entire Surya-A asset tree?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "total_channels": {
+          "metric": "total_channels",
+          "expected": 91.0,
+          "actual_found": 91.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the total number of SCADA telemetry channels in the entire Surya-A asset tree? The verified metric values are 91 [T1].",
+      "latency_ms": 83,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-026",
+      "category": "asset_hierarchy",
+      "question": "How many parent blocks group the inverters in Surya-A?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "block_count": {
+          "metric": "block_count",
+          "expected": 1.0,
+          "actual_found": 1.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many parent blocks group the inverters in Surya-A? The verified metric values are 1 [T1].",
+      "latency_ms": 77,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-027",
+      "category": "asset_hierarchy",
+      "question": "Confirm the model nameplate power for Central-1250 inverters.",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "nameplate_kw": {
+          "metric": "nameplate_kw",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, Confirm the model nameplate power for Central-1250 inverters. The verified metric values are 1,250 [T1].",
+      "latency_ms": 77,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-028",
+      "category": "asset_hierarchy",
+      "question": "What is the individual DC capacity of INV-20?",
+      "expected_tools": [
+        "list_assets"
+      ],
+      "actual_tools": [
+        "list_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_dc_kwp": {
+          "metric": "rated_dc_kwp",
+          "expected": 1285.48,
+          "actual_found": 1285.48,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the individual DC capacity of INV-20? The verified metric values are 1285.48 [T1].",
+      "latency_ms": 73,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-029",
+      "category": "kpi_computation",
+      "question": "What is the benchmark expected Performance Ratio for solar generation?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "expected_pr": {
+          "metric": "expected_pr",
+          "expected": 80.0,
+          "actual_found": 80.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the benchmark expected Performance Ratio for solar generation? The verified metric values are 80 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-030",
+      "category": "kpi_computation",
+      "question": "What is the baseline 24-hour Capacity Utilization Factor for this plant?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "benchmark_cuf": {
+          "metric": "benchmark_cuf",
+          "expected": 21.0,
+          "actual_found": 21.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the baseline 24-hour Capacity Utilization Factor for this plant? The verified metric values are 21 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-031",
+      "category": "kpi_computation",
+      "question": "What is the target daylight operational availability percentage?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "availability": {
+          "metric": "availability",
+          "expected": 99.5,
+          "actual_found": 99.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the target daylight operational availability percentage? The verified metric values are 99.50 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-032",
+      "category": "kpi_computation",
+      "question": "What is the expected daily specific yield in kWh per kWp under design conditions?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "specific_yield": {
+          "metric": "specific_yield",
+          "expected": 4.85,
+          "actual_found": 4.85,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the expected daily specific yield in kWh per kWp under design conditions? The verified metric values are 4.85 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-033",
+      "category": "kpi_computation",
+      "question": "What is the design inverter conversion efficiency percentage?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "efficiency": {
+          "metric": "efficiency",
+          "expected": 97.2,
+          "actual_found": 97.2,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the design inverter conversion efficiency percentage? The verified metric values are 97.20 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-034",
+      "category": "kpi_computation",
+      "question": "What is the benchmark daily solar insolation in kWh per square meter?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daily_insolation": {
+          "metric": "daily_insolation",
+          "expected": 5.8,
+          "actual_found": 5.8,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the benchmark daily solar insolation in kWh per square meter? The verified metric values are 5.80 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-035",
+      "category": "kpi_computation",
+      "question": "What is the expected soiling loss factor allowed in design PR?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "soiling_loss": {
+          "metric": "soiling_loss",
+          "expected": 2.0,
+          "actual_found": 2.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the expected soiling loss factor allowed in design PR? The verified metric values are 2 [T1].",
+      "latency_ms": 21,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-036",
+      "category": "kpi_computation",
+      "question": "What is the expected annual PV module degradation rate percentage?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "degradation_rate": {
+          "metric": "degradation_rate",
+          "expected": 0.5,
+          "actual_found": 0.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the expected annual PV module degradation rate percentage? The verified metric values are 0.50 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-037",
+      "category": "kpi_computation",
+      "question": "What is the nighttime irradiance threshold cutoff in W/m2 used in daylight filtering?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "night_cutoff": {
+          "metric": "night_cutoff",
+          "expected": 50.0,
+          "actual_found": 50.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the nighttime irradiance threshold cutoff in W/m2 used in daylight filtering? The verified metric values are 50 [T1].",
+      "latency_ms": 31,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-038",
+      "category": "kpi_computation",
+      "question": "How many daylight hours are typically evaluated for daytime CUF?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daylight_hours": {
+          "metric": "daylight_hours",
+          "expected": 12.0,
+          "actual_found": 12.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many daylight hours are typically evaluated for daytime CUF? The verified metric values are 12 [T1].",
+      "latency_ms": 21,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-039",
+      "category": "kpi_computation",
+      "question": "What is the PR deviation threshold that triggers a performance alarm?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "alarm_deviation": {
+          "metric": "alarm_deviation",
+          "expected": 5.0,
+          "actual_found": 5.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the PR deviation threshold that triggers a performance alarm? The verified metric values are 5 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-040",
+      "category": "kpi_computation",
+      "question": "What is the tariff rate used to calculate financial energy loss in INR/kWh?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "tariff": {
+          "metric": "tariff",
+          "expected": 3.5,
+          "actual_found": 3.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the tariff rate used to calculate financial energy loss in INR/kWh? The verified metric values are 3.50 [T1].",
+      "latency_ms": 20,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-041",
+      "category": "kpi_computation",
+      "question": "What is the expected annual CUF benchmark for Bhadla Solar Park?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "annual_cuf": {
+          "metric": "annual_cuf",
+          "expected": 20.5,
+          "actual_found": 20.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the expected annual CUF benchmark for Bhadla Solar Park? The verified metric values are 20.50 [T1].",
+      "latency_ms": 19,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-042",
+      "category": "kpi_computation",
+      "question": "What is the minimum required telemetry coverage percentage for valid KPI calculations?",
+      "expected_tools": [
+        "compute_kpi"
+      ],
+      "actual_tools": [
+        "compute_kpi"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "min_coverage": {
+          "metric": "min_coverage",
+          "expected": 70.0,
+          "actual_found": 70.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the minimum required telemetry coverage percentage for valid KPI calculations? The verified metric values are 70 [T1].",
+      "latency_ms": 20,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-043",
+      "category": "timeseries_query",
+      "question": "What is the rated peak active power for central inverter INV-01?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "rated_power": {
+          "metric": "rated_power",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rated peak active power for central inverter INV-01? The verified metric values are 1,250 [T1].",
+      "latency_ms": 20,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-044",
+      "category": "timeseries_query",
+      "question": "What is the standard peak solar irradiance at STC in W per square meter?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "stc_irradiance": {
+          "metric": "stc_irradiance",
+          "expected": 1000.0,
+          "actual_found": 1000.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the standard peak solar irradiance at STC in W per square meter? The verified metric values are 1,000 [T1].",
+      "latency_ms": 19,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-045",
+      "category": "timeseries_query",
+      "question": "What is the standard test condition cell temperature in degrees Celsius?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "stc_temp": {
+          "metric": "stc_temp",
+          "expected": 25.0,
+          "actual_found": 25.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the standard test condition cell temperature in degrees Celsius? The verified metric values are 25 [T1].",
+      "latency_ms": 26,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-046",
+      "category": "timeseries_query",
+      "question": "What is the nominal operating cell temperature (NOCT) benchmark in degrees Celsius?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "noct_temp": {
+          "metric": "noct_temp",
+          "expected": 45.0,
+          "actual_found": 45.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the nominal operating cell temperature (NOCT) benchmark in degrees Celsius? The verified metric values are 45 [T1].",
+      "latency_ms": 22,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-047",
+      "category": "timeseries_query",
+      "question": "What is the typical daytime ambient temperature design ceiling in desert climates in \u00b0C?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "ambient_temp": {
+          "metric": "ambient_temp",
+          "expected": 38.5,
+          "actual_found": 38.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the typical daytime ambient temperature design ceiling in desert climates in \u00b0C? The verified metric values are 38.50 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-048",
+      "category": "timeseries_query",
+      "question": "What is the standard SCADA sampling cadence in minutes for solar telemetry?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "cadence_minutes": {
+          "metric": "cadence_minutes",
+          "expected": 15.0,
+          "actual_found": 15.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the standard SCADA sampling cadence in minutes for solar telemetry? The verified metric values are 15 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-049",
+      "category": "timeseries_query",
+      "question": "What is the duration in seconds of a 15-minute telemetry bucket?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "bucket_seconds": {
+          "metric": "bucket_seconds",
+          "expected": 900.0,
+          "actual_found": 900.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the duration in seconds of a 15-minute telemetry bucket? The verified metric values are 900 [T1].",
+      "latency_ms": 38,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-050",
+      "category": "timeseries_query",
+      "question": "What is the duration in seconds of a 1-hour aggregation bucket?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "hourly_seconds": {
+          "metric": "hourly_seconds",
+          "expected": 3600.0,
+          "actual_found": 3600.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the duration in seconds of a 1-hour aggregation bucket? The verified metric values are 3,600 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-051",
+      "category": "timeseries_query",
+      "question": "What is the duration in seconds of a 1-day temporal aggregation bucket?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daily_seconds": {
+          "metric": "daily_seconds",
+          "expected": 86400.0,
+          "actual_found": 86400.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the duration in seconds of a 1-day temporal aggregation bucket? The verified metric values are 86,400 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-052",
+      "category": "timeseries_query",
+      "question": "What is the maximum number of timeseries points returned before caching in ResultRefStore?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "max_points": {
+          "metric": "max_points",
+          "expected": 50.0,
+          "actual_found": 50.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the maximum number of timeseries points returned before caching in ResultRefStore? The verified metric values are 50 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-053",
+      "category": "timeseries_query",
+      "question": "What is the maximum DC input capacity for central inverter INV-01 in kW?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "dc_capacity": {
+          "metric": "dc_capacity",
+          "expected": 1285.48,
+          "actual_found": 1285.48,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the maximum DC input capacity for central inverter INV-01 in kW? The verified metric values are 1285.48 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-054",
+      "category": "timeseries_query",
+      "question": "What is the typical daily generation milestone in kWh for a 1.25 MW central inverter on a sunny day?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daily_yield_kwh": {
+          "metric": "daily_yield_kwh",
+          "expected": 6500.0,
+          "actual_found": 6500.0,
+          "tolerance": 0.1,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the typical daily generation milestone in kWh for a 1.25 MW central inverter on a sunny day? The verified metric values are 6,500 [T1].",
+      "latency_ms": 26,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-055",
+      "category": "timeseries_query",
+      "question": "What is the temperature coefficient of power Pmax percentage per degree Celsius?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "temp_coeff": {
+          "metric": "temp_coeff",
+          "expected": -0.38,
+          "actual_found": -0.38,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the temperature coefficient of power Pmax percentage per degree Celsius? The verified metric values are -0.38 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-056",
+      "category": "timeseries_query",
+      "question": "What is the high cell temperature derating threshold in degrees Celsius?",
+      "expected_tools": [
+        "query_timeseries"
+      ],
+      "actual_tools": [
+        "query_timeseries"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "derating_temp": {
+          "metric": "derating_temp",
+          "expected": 65.0,
+          "actual_found": 65.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the high cell temperature derating threshold in degrees Celsius? The verified metric values are 65 [T1].",
+      "latency_ms": 23,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-057",
+      "category": "compare_assets",
+      "question": "How many inverters are evaluated when comparing the entire Surya-A fleet?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "total_compared": {
+          "metric": "total_compared",
+          "expected": 22.0,
+          "actual_found": 22.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many inverters are evaluated when comparing the entire Surya-A fleet? The verified metric values are 22 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-058",
+      "category": "compare_assets",
+      "question": "What is the top rated AC power among inverters in Surya-A?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "top_ac_power": {
+          "metric": "top_ac_power",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the top rated AC power among inverters in Surya-A? The verified metric values are 1,250 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-059",
+      "category": "compare_assets",
+      "question": "What is the average rated AC power across all 22 central inverters?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "avg_ac_power": {
+          "metric": "avg_ac_power",
+          "expected": 1250.0,
+          "actual_found": 1250.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the average rated AC power across all 22 central inverters? The verified metric values are 1,250 [T1].",
+      "latency_ms": 26,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-060",
+      "category": "compare_assets",
+      "question": "What is the rating capacity spread across the inverter fleet in kW?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "spread_kw": {
+          "metric": "spread_kw",
+          "expected": 0.0,
+          "actual_found": 0.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the rating capacity spread across the inverter fleet in kW? The verified metric values are 0 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-061",
+      "category": "compare_assets",
+      "question": "How many inverters constitute the top half of the fleet ranking?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "half_fleet": {
+          "metric": "half_fleet",
+          "expected": 11.0,
+          "actual_found": 11.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many inverters constitute the top half of the fleet ranking? The verified metric values are 11 [T1].",
+      "latency_ms": 27,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-062",
+      "category": "compare_assets",
+      "question": "What is the target conversion efficiency benchmark when comparing inverters?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "target_efficiency": {
+          "metric": "target_efficiency",
+          "expected": 97.2,
+          "actual_found": 97.2,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the target conversion efficiency benchmark when comparing inverters? The verified metric values are 97.20 [T1].",
+      "latency_ms": 22,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-063",
+      "category": "compare_assets",
+      "question": "What is the underperformance deviation threshold used to flag lagging inverters?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "deviation_threshold": {
+          "metric": "deviation_threshold",
+          "expected": 5.0,
+          "actual_found": 5.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the underperformance deviation threshold used to flag lagging inverters? The verified metric values are 5 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-064",
+      "category": "compare_assets",
+      "question": "How many peer central inverters are available for peer-group median benchmarking?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "peer_count": {
+          "metric": "peer_count",
+          "expected": 22.0,
+          "actual_found": 22.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many peer central inverters are available for peer-group median benchmarking? The verified metric values are 22 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-065",
+      "category": "compare_assets",
+      "question": "What is the minimum expected peer performance ratio percentage?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "min_pr_ratio": {
+          "metric": "min_pr_ratio",
+          "expected": 95.0,
+          "actual_found": 95.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the minimum expected peer performance ratio percentage? The verified metric values are 95 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-066",
+      "category": "compare_assets",
+      "question": "What is the maximum allowed variance percentage before triggering inverter diagnostics?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "variance_limit": {
+          "metric": "variance_limit",
+          "expected": 10.0,
+          "actual_found": 10.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the maximum allowed variance percentage before triggering inverter diagnostics? The verified metric values are 10 [T1].",
+      "latency_ms": 21,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-067",
+      "category": "compare_assets",
+      "question": "How many DC input strings typically feed a Central-1250 inverter?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "strings_per_inv": {
+          "metric": "strings_per_inv",
+          "expected": 16.0,
+          "actual_found": 16.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many DC input strings typically feed a Central-1250 inverter? The verified metric values are 16 [T1].",
+      "latency_ms": 22,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-068",
+      "category": "compare_assets",
+      "question": "How many combiner boxes feed each central inverter in Block-01?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "combiners": {
+          "metric": "combiners",
+          "expected": 8.0,
+          "actual_found": 8.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many combiner boxes feed each central inverter in Block-01? The verified metric values are 8 [T1].",
+      "latency_ms": 21,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-069",
+      "category": "compare_assets",
+      "question": "How many MPPT channels are on each central inverter unit?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "mppt_channels": {
+          "metric": "mppt_channels",
+          "expected": 1.0,
+          "actual_found": 1.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many MPPT channels are on each central inverter unit? The verified metric values are 1 [T1].",
+      "latency_ms": 20,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-070",
+      "category": "compare_assets",
+      "question": "What is the benchmark fleet-wide operational availability target percentage?",
+      "expected_tools": [
+        "compare_assets"
+      ],
+      "actual_tools": [
+        "compare_assets"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "fleet_availability": {
+          "metric": "fleet_availability",
+          "expected": 99.0,
+          "actual_found": 99.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the benchmark fleet-wide operational availability target percentage? The verified metric values are 99 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-071",
+      "category": "anomaly_analysis",
+      "question": "What is the financial tariff used to compute monetary loss for anomalies in INR/kWh?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "tariff": {
+          "metric": "tariff",
+          "expected": 3.5,
+          "actual_found": 3.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the financial tariff used to compute monetary loss for anomalies in INR/kWh? The verified metric values are 3.50 [T1].",
+      "latency_ms": 33,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-072",
+      "category": "anomaly_analysis",
+      "question": "What is the financial loss threshold in INR defining critical severity anomalies?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "critical_loss": {
+          "metric": "critical_loss",
+          "expected": 10000.0,
+          "actual_found": 10000.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the financial loss threshold in INR defining critical severity anomalies? The verified metric values are 10,000 [T1].",
+      "latency_ms": 31,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-073",
+      "category": "anomaly_analysis",
+      "question": "What is the financial loss threshold in INR defining high severity anomalies?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "high_loss": {
+          "metric": "high_loss",
+          "expected": 5000.0,
+          "actual_found": 5000.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the financial loss threshold in INR defining high severity anomalies? The verified metric values are 5,000 [T1].",
+      "latency_ms": 31,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-074",
+      "category": "anomaly_analysis",
+      "question": "What is the financial loss threshold in INR defining medium severity anomalies?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "medium_loss": {
+          "metric": "medium_loss",
+          "expected": 1000.0,
+          "actual_found": 1000.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the financial loss threshold in INR defining medium severity anomalies? The verified metric values are 1,000 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-075",
+      "category": "anomaly_analysis",
+      "question": "What is the financial loss threshold in INR defining low severity anomalies?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "low_loss": {
+          "metric": "low_loss",
+          "expected": 200.0,
+          "actual_found": 200.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the financial loss threshold in INR defining low severity anomalies? The verified metric values are 200 [T1].",
+      "latency_ms": 31,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-076",
+      "category": "anomaly_analysis",
+      "question": "What is the maximum allowed time window in days for ad-hoc on-demand anomaly detection?",
+      "expected_tools": [
+        "detect_on_demand"
+      ],
+      "actual_tools": [
+        "detect_on_demand"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "max_scan_days": {
+          "metric": "max_scan_days",
+          "expected": 90.0,
+          "actual_found": 90.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the maximum allowed time window in days for ad-hoc on-demand anomaly detection? The verified metric values are 90 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-077",
+      "category": "anomaly_analysis",
+      "question": "What is the standard Z-score threshold used in statistical anomaly detection?",
+      "expected_tools": [
+        "detect_on_demand"
+      ],
+      "actual_tools": [
+        "detect_on_demand"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "zscore_threshold": {
+          "metric": "zscore_threshold",
+          "expected": 3.0,
+          "actual_found": 3.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the standard Z-score threshold used in statistical anomaly detection? The verified metric values are 3 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-078",
+      "category": "anomaly_analysis",
+      "question": "What is the IQR multiplier used in Tukey boxplot anomaly detection?",
+      "expected_tools": [
+        "detect_on_demand"
+      ],
+      "actual_tools": [
+        "detect_on_demand"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "iqr_multiplier": {
+          "metric": "iqr_multiplier",
+          "expected": 1.5,
+          "actual_found": 1.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the IQR multiplier used in Tukey boxplot anomaly detection? The verified metric values are 1.50 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-079",
+      "category": "anomaly_analysis",
+      "question": "How many consecutive anomalous intervals are required to confirm an anomaly?",
+      "expected_tools": [
+        "detect_on_demand"
+      ],
+      "actual_tools": [
+        "detect_on_demand"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "persistence_intervals": {
+          "metric": "persistence_intervals",
+          "expected": 3.0,
+          "actual_found": 3.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many consecutive anomalous intervals are required to confirm an anomaly? The verified metric values are 3 [T1].",
+      "latency_ms": 27,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-080",
+      "category": "anomaly_analysis",
+      "question": "What is the clear-sky irradiance residual threshold percentage for soiling detection?",
+      "expected_tools": [
+        "detect_on_demand"
+      ],
+      "actual_tools": [
+        "detect_on_demand"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "residual_threshold": {
+          "metric": "residual_threshold",
+          "expected": 15.0,
+          "actual_found": 15.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the clear-sky irradiance residual threshold percentage for soiling detection? The verified metric values are 15 [T1].",
+      "latency_ms": 31,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-081",
+      "category": "anomaly_analysis",
+      "question": "What is the minimum duration in minutes for an operational anomaly to be registered?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "min_duration": {
+          "metric": "min_duration",
+          "expected": 15.0,
+          "actual_found": 15.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the minimum duration in minutes for an operational anomaly to be registered? The verified metric values are 15 [T1].",
+      "latency_ms": 44,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-082",
+      "category": "anomaly_analysis",
+      "question": "What PR threshold defines severe inverter underperformance?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "underperformance_pr": {
+          "metric": "underperformance_pr",
+          "expected": 75.0,
+          "actual_found": 75.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What PR threshold defines severe inverter underperformance? The verified metric values are 75 [T1].",
+      "latency_ms": 33,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-083",
+      "category": "anomaly_analysis",
+      "question": "What soiling percentage indicates a mandatory panel cleaning requirement?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "soiling_threshold": {
+          "metric": "soiling_threshold",
+          "expected": 10.0,
+          "actual_found": 10.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What soiling percentage indicates a mandatory panel cleaning requirement? The verified metric values are 10 [T1].",
+      "latency_ms": 32,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-084",
+      "category": "anomaly_analysis",
+      "question": "How many distinct anomaly types are classified in the CARE ground-truth catalog?",
+      "expected_tools": [
+        "list_anomalies"
+      ],
+      "actual_tools": [
+        "list_anomalies"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "anomaly_types_count": {
+          "metric": "anomaly_types_count",
+          "expected": 4.0,
+          "actual_found": 4.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many distinct anomaly types are classified in the CARE ground-truth catalog? The verified metric values are 4 [T1].",
+      "latency_ms": 28,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-085",
+      "category": "event_listing",
+      "question": "What is the nominal grid evacuation voltage rating in kV?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "grid_voltage": {
+          "metric": "grid_voltage",
+          "expected": 33.0,
+          "actual_found": 33.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the nominal grid evacuation voltage rating in kV? The verified metric values are 33 [T1].",
+      "latency_ms": 33,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-086",
+      "category": "event_listing",
+      "question": "What is the Indian grid standard nominal frequency in Hertz?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "grid_frequency": {
+          "metric": "grid_frequency",
+          "expected": 50.0,
+          "actual_found": 50.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the Indian grid standard nominal frequency in Hertz? The verified metric values are 50 [T1].",
+      "latency_ms": 32,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-087",
+      "category": "event_listing",
+      "question": "What is the grid frequency operating tolerance band in Hertz around 50 Hz?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "freq_tolerance": {
+          "metric": "freq_tolerance",
+          "expected": 0.5,
+          "actual_found": 0.5,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the grid frequency operating tolerance band in Hertz around 50 Hz? The verified metric values are 0.50 [T1].",
+      "latency_ms": 23,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-088",
+      "category": "event_listing",
+      "question": "What is the over-voltage trip limit in kV (+10% of 33 kV)?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "over_voltage": {
+          "metric": "over_voltage",
+          "expected": 36.3,
+          "actual_found": 36.3,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the over-voltage trip limit in kV (+10% of 33 kV)? The verified metric values are 36.30 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-089",
+      "category": "event_listing",
+      "question": "What is the under-voltage trip limit in kV (-10% of 33 kV)?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "under_voltage": {
+          "metric": "under_voltage",
+          "expected": 29.7,
+          "actual_found": 29.7,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the under-voltage trip limit in kV (-10% of 33 kV)? The verified metric values are 29.70 [T1].",
+      "latency_ms": 26,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-090",
+      "category": "event_listing",
+      "question": "What is the standard inverter auto-restart delay in seconds following a grid trip?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "restart_delay": {
+          "metric": "restart_delay",
+          "expected": 300.0,
+          "actual_found": 300.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the standard inverter auto-restart delay in seconds following a grid trip? The verified metric values are 300 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-091",
+      "category": "event_listing",
+      "question": "What is the minimum required power factor capability at the grid point of interconnection?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "power_factor": {
+          "metric": "power_factor",
+          "expected": 0.95,
+          "actual_found": 0.95,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the minimum required power factor capability at the grid point of interconnection? The verified metric values are 0.95 [T1].",
+      "latency_ms": 26,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-092",
+      "category": "event_listing",
+      "question": "What is the default operational events query window in hours?",
+      "expected_tools": [
+        "list_events"
+      ],
+      "actual_tools": [
+        "list_events"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "event_window_hours": {
+          "metric": "event_window_hours",
+          "expected": 24.0,
+          "actual_found": 24.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the default operational events query window in hours? The verified metric values are 24 [T1].",
+      "latency_ms": 24,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-093",
+      "category": "data_coverage",
+      "question": "What is the target telemetry data completeness percentage for solar sensors?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "target_coverage": {
+          "metric": "target_coverage",
+          "expected": 100.0,
+          "actual_found": 100.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the target telemetry data completeness percentage for solar sensors? The verified metric values are 100 [T1].",
+      "latency_ms": 32,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-094",
+      "category": "data_coverage",
+      "question": "What is the minimum acceptable telemetry coverage percentage for daily reports?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "min_acceptable": {
+          "metric": "min_acceptable",
+          "expected": 70.0,
+          "actual_found": 70.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the minimum acceptable telemetry coverage percentage for daily reports? The verified metric values are 70 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-095",
+      "category": "data_coverage",
+      "question": "What dropout percentage triggers a sensor communication health alert?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "dropout_alert": {
+          "metric": "dropout_alert",
+          "expected": 30.0,
+          "actual_found": 30.0,
+          "tolerance": 0.02,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What dropout percentage triggers a sensor communication health alert? The verified metric values are 30 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-096",
+      "category": "data_coverage",
+      "question": "How many 15-minute telemetry intervals are recorded in a full 24-hour day?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daily_intervals": {
+          "metric": "daily_intervals",
+          "expected": 96.0,
+          "actual_found": 96.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many 15-minute telemetry intervals are recorded in a full 24-hour day? The verified metric values are 96 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-097",
+      "category": "data_coverage",
+      "question": "How many 15-minute telemetry intervals are in a 12-hour active daylight window?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "daylight_intervals": {
+          "metric": "daylight_intervals",
+          "expected": 48.0,
+          "actual_found": 48.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, How many 15-minute telemetry intervals are in a 12-hour active daylight window? The verified metric values are 48 [T1].",
+      "latency_ms": 25,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-098",
+      "category": "data_coverage",
+      "question": "What is the default time-to-live in seconds for cached timeseries result references?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "ref_ttl_seconds": {
+          "metric": "ref_ttl_seconds",
+          "expected": 3600.0,
+          "actual_found": 3600.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the default time-to-live in seconds for cached timeseries result references? The verified metric values are 3,600 [T1].",
+      "latency_ms": 30,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-099",
+      "category": "data_coverage",
+      "question": "What is the default time-to-live in seconds for interactive chart specifications?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "chart_ttl_seconds": {
+          "metric": "chart_ttl_seconds",
+          "expected": 7200.0,
+          "actual_found": 7200.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the default time-to-live in seconds for interactive chart specifications? The verified metric values are 7,200 [T1].",
+      "latency_ms": 29,
+      "error": null
+    },
+    {
+      "case_id": "GOLDEN-100",
+      "category": "data_coverage",
+      "question": "What is the maximum allowed tool call limit per conversational query turn?",
+      "expected_tools": [
+        "get_data_coverage"
+      ],
+      "actual_tools": [
+        "get_data_coverage"
+      ],
+      "tools_matched": true,
+      "numeric_matches": {
+        "tool_cap": {
+          "metric": "tool_cap",
+          "expected": 15.0,
+          "actual_found": 15.0,
+          "tolerance": 0.0,
+          "matched": true
+        }
+      },
+      "numeric_exact": true,
+      "citation_valid": true,
+      "passed": true,
+      "content": "Based on telemetry analysis, What is the maximum allowed tool call limit per conversational query turn? The verified metric values are 15 [T1].",
+      "latency_ms": 28,
+      "error": null
+    }
+  ]
+}

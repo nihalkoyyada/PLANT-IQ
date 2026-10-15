@@ -25,6 +25,10 @@ redis==5.0.8
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx==0.28.1
+<<<<<<< HEAD
 httpx2==2.13.1
 scikit-learn==1.7.2
 resend==2.49.1
+=======
+scikit-learn==1.7.2
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303

@@ -535,15 +535,47 @@ class Channel(Base):
     readings: Mapped[List["Reading"]] = relationship("Reading", back_populates="channel", cascade="all, delete-orphan")
 
     def __init__(self, **kwargs: Any) -> None:
+        if "name" in kwargs and "source_name" not in kwargs:
+            kwargs["source_name"] = kwargs.pop("name")
+        if "signal_key" in kwargs and "canonical_key" not in kwargs:
+            kwargs["canonical_key"] = kwargs.pop("signal_key")
         if "canonical_signal_key" in kwargs:
             kwargs["canonical_key"] = kwargs.pop("canonical_signal_key")
+        if "unit" in kwargs and "receive_unit" not in kwargs:
+            kwargs["receive_unit"] = kwargs.pop("unit")
         if "source_unit" in kwargs:
             kwargs["receive_unit"] = kwargs.pop("source_unit")
         if "aggregation_method" in kwargs:
             kwargs["agg_semantics"] = kwargs.pop("aggregation_method")
+        if "interval_s" not in kwargs:
+            kwargs["interval_s"] = 900
         kwargs.pop("metadata_json", None)
         kwargs.pop("metadata", None)
         super().__init__(**kwargs)
+
+    @property
+    def signal_key(self) -> str:
+        return self.canonical_key
+
+    @signal_key.setter
+    def signal_key(self, value: str) -> None:
+        self.canonical_key = value
+
+    @property
+    def name(self) -> str:
+        return self.source_name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        self.source_name = value
+
+    @property
+    def unit(self) -> Optional[str]:
+        return self.receive_unit
+
+    @unit.setter
+    def unit(self, value: Optional[str]) -> None:
+        self.receive_unit = value
 
     @property
     def canonical_signal_key(self) -> str:
@@ -790,6 +822,11 @@ class Reading(Base):
     channel: Mapped["Channel"] = relationship("Channel", back_populates="readings")
     ingestion_job: Mapped[Optional["IngestionJob"]] = relationship("IngestionJob", back_populates="readings")
 
+    def __init__(self, **kwargs: Any) -> None:
+        if "val" in kwargs and "value" not in kwargs:
+            kwargs["value"] = kwargs.pop("val")
+        super().__init__(**kwargs)
+
     @property
     def timestamp(self) -> datetime:
         return self.ts
@@ -963,9 +1000,19 @@ class Event(Base):
     asset: Mapped[Optional["Asset"]] = relationship("Asset")
 
     def __init__(self, **kwargs: Any) -> None:
+        if "description" in kwargs and "message" not in kwargs:
+            kwargs["message"] = kwargs.pop("description")
         if "metadata" in kwargs:
             kwargs["metadata_json"] = kwargs.pop("metadata")
         super().__init__(**kwargs)
+
+    @property
+    def description(self) -> str:
+        return self.message
+
+    @description.setter
+    def description(self, value: str) -> None:
+        self.message = value
 
 
 class Detector(Base):
@@ -1144,6 +1191,39 @@ class Anomaly(Base):
     detector: Mapped[Optional["Detector"]] = relationship("Detector")
     rca_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[rca_by])
 
+    def __init__(self, **kwargs: Any) -> None:
+        det = kwargs.setdefault("details", {})
+        if not isinstance(det, dict):
+            det = {}
+            kwargs["details"] = det
+        if "detector_method" in kwargs:
+            det["detector_method"] = kwargs.pop("detector_method")
+        if "detector_version" in kwargs:
+            det["detector_version"] = kwargs.pop("detector_version")
+        if "kwh_lost" in kwargs:
+            det["loss_kwh"] = kwargs.pop("kwh_lost")
+        if "financial_loss_inr" in kwargs:
+            det["total_financial_loss_inr"] = kwargs.pop("financial_loss_inr")
+        if "context_json" in kwargs:
+            ctx = kwargs.pop("context_json")
+            if isinstance(ctx, dict):
+                det.update(ctx)
+        super().__init__(**kwargs)
+
+    @property
+    def detector_method(self) -> Optional[str]:
+        if self.details and isinstance(self.details, dict):
+            return self.details.get("detector_method", self.source)
+        return self.source
+
+    @property
+    def root_cause(self) -> Optional[str]:
+        if self.rca_narrative and isinstance(self.rca_narrative, dict):
+            return self.rca_narrative.get("root_cause")
+        if self.details and isinstance(self.details, dict):
+            return self.details.get("root_cause")
+        return None
+
     __table_args__ = (
         CheckConstraint(
             "severity IN ('low', 'medium', 'high', 'critical')",
@@ -1199,10 +1279,17 @@ class AuditLog(Base):
     user: Mapped[Optional["User"]] = relationship("User")
 
 
+<<<<<<< HEAD
 class AlertRule(Base):
     """Configurable alert rule for anomaly severity or KPI breach monitoring."""
 
     __tablename__ = "alert_rules"
+=======
+class Conversation(Base):
+    """Copilot conversation session thread (§10.2, FR-6.1)."""
+
+    __tablename__ = "conversations"
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -1210,10 +1297,19 @@ class AlertRule(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
+<<<<<<< HEAD
+=======
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     plant_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("plants.id", ondelete="CASCADE"),
         nullable=False,
+<<<<<<< HEAD
         index=True,
     )
     name: Mapped[str] = mapped_column(
@@ -1253,6 +1349,12 @@ class AlertRule(Base):
         nullable=False,
         default=dict,
         server_default="{}",
+=======
+    )
+    title: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -1260,6 +1362,7 @@ class AlertRule(Base):
         server_default=func.now(),
     )
 
+<<<<<<< HEAD
     plant: Mapped["Plant"] = relationship("Plant")
 
     __table_args__ = (
@@ -1278,6 +1381,22 @@ class AlertDelivery(Base):
     """Audit log and dispatch record for alert notifications (email, webhook)."""
 
     __tablename__ = "alert_deliveries"
+=======
+    user: Mapped["User"] = relationship("User")
+    plant: Mapped["Plant"] = relationship("Plant")
+    messages: Mapped[List["Message"]] = relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at",
+    )
+
+
+class Message(Base):
+    """Individual interaction turn in a Copilot conversation thread (§10.2)."""
+
+    __tablename__ = "messages"
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -1285,6 +1404,7 @@ class AlertDelivery(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
+<<<<<<< HEAD
     rule_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("alert_rules.id", ondelete="CASCADE"),
@@ -1310,10 +1430,98 @@ class AlertDelivery(Base):
     recipient: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+=======
+    conversation_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    model: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    tool_ids: Mapped[List[UUID]] = mapped_column(
+        JSON().with_variant(ARRAY(Uuid(as_uuid=True)), "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=list,
+    )
+    latency_ms: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+    tool_calls: Mapped[List["ToolCallRecord"]] = relationship(
+        "ToolCallRecord",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        order_by="ToolCallRecord.seq",
+    )
+    charts: Mapped[List["ChartRecord"]] = relationship(
+        "ChartRecord",
+        back_populates="message",
+        cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_messages_role"),
+    )
+
+
+class ToolCallRecord(Base):
+    """Detailed intermediate tool execution record within an assistant message (§10.2)."""
+
+    __tablename__ = "tool_calls"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    message_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    seq: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+    tool_name: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    input: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=dict,
+    )
+    output: Mapped[Optional[dict]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     )
     status: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+<<<<<<< HEAD
     )
     dedup_key: Mapped[str] = mapped_column(
         Text,
@@ -1334,16 +1542,61 @@ class AlertDelivery(Base):
     )
     error_message: Mapped[Optional[str]] = mapped_column(
         Text,
+=======
+        default="ok",
+    )
+    duration_ms: Mapped[Optional[int]] = mapped_column(
+        Integer,
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+<<<<<<< HEAD
         index=True,
     )
 
     rule: Mapped["AlertRule"] = relationship("AlertRule")
     plant: Mapped["Plant"] = relationship("Plant")
     anomaly: Mapped[Optional["Anomaly"]] = relationship("Anomaly")
+=======
+    )
+
+    message: Mapped["Message"] = relationship("Message", back_populates="tool_calls")
+
+    __table_args__ = (
+        CheckConstraint("status IN ('ok', 'error', 'rejected')", name="ck_tool_calls_status"),
+    )
+
+
+class ChartRecord(Base):
+    """Persisted ECharts visualization specification tied to a Copilot turn (§10.3)."""
+
+    __tablename__ = "charts"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    message_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("messages.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    spec: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    message: Mapped[Optional["Message"]] = relationship("Message", back_populates="charts")
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 

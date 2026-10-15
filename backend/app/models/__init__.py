@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """Export all SQLAlchemy models."""
 
 from app.models.base import Base, TimestampMixin, generate_uuid
@@ -45,4 +46,58 @@ __all__ = [
     "Reading",
     "JobHistory",
     "KPIValue",
-]
+]
+=======
+"""Export all SQLAlchemy models."""
+
+from app.models.base import Base, TimestampMixin, generate_uuid
+
+from app.models.entities import (
+    Anomaly,
+    Asset,
+    AuditLog,
+    CanonicalSignal,
+    Channel,
+    ChartRecord,
+    Conversation,
+    Detector,
+    Event,
+    File,
+    IngestionJob,
+    JobHistory,
+    KPIValue,
+    MappingTemplate,
+    Message,
+    Organization,
+    Plant,
+    Reading,
+    ToolCallRecord,
+    User,
+)
+
+__all__ = [
+    "Base",
+    "TimestampMixin",
+    "generate_uuid",
+    "Organization",
+    "User",
+    "Plant",
+    "Asset",
+    "AuditLog",
+    "Anomaly",
+    "CanonicalSignal",
+    "Channel",
+    "Detector",
+    "Event",
+    "File",
+    "MappingTemplate",
+    "IngestionJob",
+    "Reading",
+    "JobHistory",
+    "KPIValue",
+    "Conversation",
+    "Message",
+    "ToolCallRecord",
+    "ChartRecord",
+]
+>>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303

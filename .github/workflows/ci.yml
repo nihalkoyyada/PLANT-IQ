@@ -69,7 +69,31 @@ jobs:
           JWT_SECRET: dev_secret_key_change_in_production
         run: |
           cd backend
-          pytest tests/api tests/ai/test_daylight_coverage.py tests/ai/test_file_profiler.py tests/ai/test_ingest_worker.py tests/ai/test_job_history.py tests/ai/test_kpi_engine.py tests/ai/test_mapping_suggester.py
+          pytest tests/api tests/ai/test_daylight_coverage.py tests/ai/test_file_profiler.py tests/ai/test_ingest_worker.py tests/ai/test_job_history.py tests/ai/test_kpi_engine.py tests/ai/test_mapping_suggester.py tests/copilot tests/llm
+
+      - name: Seed Surya-A Benchmark Data
+        env:
+          DATABASE_URL: postgresql+psycopg://plantiq:plantiq_dev_password@localhost:5432/plantiq
+        run: |
+          cd backend
+          python scripts/seed_surya.py
+
+      - name: Execute Copilot Evaluation Suite & Enforce Quality Gate (>= 80% Numeric Pass Rate)
+        env:
+          DATABASE_URL: postgresql+psycopg://plantiq:plantiq_dev_password@localhost:5432/plantiq
+        run: |
+          cd backend
+          python scripts/run_copilot_eval.py --threshold 80.0 --provider ci --report-path ../docs/copilot-eval-report.md --json-output ../docs/copilot-eval-summary.json
+
+      - name: Upload Copilot Evaluation Report & Metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: copilot-eval-report
+          path: |
+            docs/copilot-eval-report.md
+            docs/copilot-eval-summary.json
+          retention-days: 14
 
   frontend-checks:
     name: Frontend TypeCheck & Build

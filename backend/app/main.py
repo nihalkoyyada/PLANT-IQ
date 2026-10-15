@@ -17,11 +17,8 @@ from app.api.kpis import router as kpis_router
 from app.api.canonical_signals import router as canonical_signals_router
 from app.api.detectors import router as detectors_router
 from app.api.anomalies import router as anomalies_router
-<<<<<<< HEAD
 from app.api.alert_rules import router as alert_rules_router
-=======
 from app.api.copilot import router as copilot_router
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 from app.api.dev import router as dev_router
 from app.core.config import settings
 from app.db.session import create_db_engine, get_session_factory

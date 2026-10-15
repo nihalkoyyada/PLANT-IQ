@@ -1279,17 +1279,10 @@ class AuditLog(Base):
     user: Mapped[Optional["User"]] = relationship("User")
 
 
-<<<<<<< HEAD
 class AlertRule(Base):
     """Configurable alert rule for anomaly severity or KPI breach monitoring."""
 
     __tablename__ = "alert_rules"
-=======
-class Conversation(Base):
-    """Copilot conversation session thread (§10.2, FR-6.1)."""
-
-    __tablename__ = "conversations"
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -1297,19 +1290,10 @@ class Conversation(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
-<<<<<<< HEAD
-=======
-    user_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-    )
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     plant_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("plants.id", ondelete="CASCADE"),
         nullable=False,
-<<<<<<< HEAD
         index=True,
     )
     name: Mapped[str] = mapped_column(
@@ -1349,12 +1333,6 @@ class Conversation(Base):
         nullable=False,
         default=dict,
         server_default="{}",
-=======
-    )
-    title: Mapped[Optional[str]] = mapped_column(
-        Text,
-        nullable=True,
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -1362,7 +1340,6 @@ class Conversation(Base):
         server_default=func.now(),
     )
 
-<<<<<<< HEAD
     plant: Mapped["Plant"] = relationship("Plant")
 
     __table_args__ = (
@@ -1381,22 +1358,6 @@ class AlertDelivery(Base):
     """Audit log and dispatch record for alert notifications (email, webhook)."""
 
     __tablename__ = "alert_deliveries"
-=======
-    user: Mapped["User"] = relationship("User")
-    plant: Mapped["Plant"] = relationship("Plant")
-    messages: Mapped[List["Message"]] = relationship(
-        "Message",
-        back_populates="conversation",
-        cascade="all, delete-orphan",
-        order_by="Message.created_at",
-    )
-
-
-class Message(Base):
-    """Individual interaction turn in a Copilot conversation thread (§10.2)."""
-
-    __tablename__ = "messages"
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 
     id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
@@ -1404,7 +1365,6 @@ class Message(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
-<<<<<<< HEAD
     rule_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("alert_rules.id", ondelete="CASCADE"),
@@ -1430,7 +1390,96 @@ class Message(Base):
     recipient: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-=======
+    )
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    dedup_key: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True,
+    )
+    attempt_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    payload: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        default=dict,
+        server_default="{}",
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
+
+    rule: Mapped["AlertRule"] = relationship("AlertRule")
+    plant: Mapped["Plant"] = relationship("Plant")
+    anomaly: Mapped[Optional["Anomaly"]] = relationship("Anomaly")
+
+
+class Conversation(Base):
+    """Copilot conversation session thread (§10.2, FR-6.1)."""
+
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    user: Mapped["User"] = relationship("User")
+    plant: Mapped["Plant"] = relationship("Plant")
+    messages: Mapped[List["Message"]] = relationship(
+        "Message",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="Message.created_at",
+    )
+
+
+class Message(Base):
+    """Individual interaction turn in a Copilot conversation thread (§10.2)."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
     conversation_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("conversations.id", ondelete="CASCADE"),
@@ -1516,52 +1565,20 @@ class ToolCallRecord(Base):
     output: Mapped[Optional[dict]] = mapped_column(
         JSON().with_variant(JSONB, "postgresql"),
         nullable=True,
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
     )
     status: Mapped[str] = mapped_column(
         Text,
         nullable=False,
-<<<<<<< HEAD
-    )
-    dedup_key: Mapped[str] = mapped_column(
-        Text,
-        nullable=False,
-        index=True,
-    )
-    attempt_count: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=1,
-        server_default="1",
-    )
-    payload: Mapped[dict] = mapped_column(
-        JSON().with_variant(JSONB, "postgresql"),
-        nullable=False,
-        default=dict,
-        server_default="{}",
-    )
-    error_message: Mapped[Optional[str]] = mapped_column(
-        Text,
-=======
         default="ok",
     )
     duration_ms: Mapped[Optional[int]] = mapped_column(
         Integer,
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-<<<<<<< HEAD
-        index=True,
-    )
-
-    rule: Mapped["AlertRule"] = relationship("AlertRule")
-    plant: Mapped["Plant"] = relationship("Plant")
-    anomaly: Mapped[Optional["Anomaly"]] = relationship("Anomaly")
-=======
     )
 
     message: Mapped["Message"] = relationship("Message", back_populates="tool_calls")
@@ -1598,5 +1615,4 @@ class ChartRecord(Base):
     )
 
     message: Mapped[Optional["Message"]] = relationship("Message", back_populates="charts")
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303
 

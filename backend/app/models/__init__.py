@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 """Export all SQLAlchemy models."""
 
 from app.models.base import Base, TimestampMixin, generate_uuid
@@ -6,53 +5,6 @@ from app.models.base import Base, TimestampMixin, generate_uuid
 from app.models.entities import (
     AlertDelivery,
     AlertRule,
-    Anomaly,
-    Asset,
-    AuditLog,
-    CanonicalSignal,
-    Channel,
-    Detector,
-    Event,
-    File,
-    IngestionJob,
-    JobHistory,
-    KPIValue,
-    MappingTemplate,
-    Organization,
-    Plant,
-    Reading,
-    User,
-)
-
-__all__ = [
-    "Base",
-    "TimestampMixin",
-    "generate_uuid",
-    "Organization",
-    "User",
-    "Plant",
-    "Asset",
-    "AuditLog",
-    "Anomaly",
-    "AlertRule",
-    "AlertDelivery",
-    "CanonicalSignal",
-    "Channel",
-    "Detector",
-    "Event",
-    "File",
-    "MappingTemplate",
-    "IngestionJob",
-    "Reading",
-    "JobHistory",
-    "KPIValue",
-]
-=======
-"""Export all SQLAlchemy models."""
-
-from app.models.base import Base, TimestampMixin, generate_uuid
-
-from app.models.entities import (
     Anomaly,
     Asset,
     AuditLog,
@@ -85,6 +37,8 @@ __all__ = [
     "Asset",
     "AuditLog",
     "Anomaly",
+    "AlertRule",
+    "AlertDelivery",
     "CanonicalSignal",
     "Channel",
     "Detector",
@@ -100,4 +54,3 @@ __all__ = [
     "ToolCallRecord",
     "ChartRecord",
 ]
->>>>>>> 780d37c1e16a815cce8bc019fc8a89b98b446303

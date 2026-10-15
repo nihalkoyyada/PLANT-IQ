@@ -249,12 +249,14 @@ def run_demo_simulation(tariff_inr: float = 4.20) -> None:
 
 def run_csv_dataset_scan(
     csv_path: str,
+    weather_path: Optional[str] = None,
     ground_truth_path: Optional[str] = None,
     target_devices: Optional[List[str]] = None,
+    all_devices: bool = False,
     detector_methods: Optional[List[str]] = None,
     tariff_inr: float = 4.20,
 ) -> None:
-    """Scan a solar CSV dataset (e.g. Surya-A-demo.csv) with injected field anomalies."""
+    """Scan a solar CSV dataset (e.g. Surya-A-demo.csv or Plant_1_Generation_Data.csv) with anomaly detectors."""
     import json
     import polars as pl
     from app.ai.anomaly_policy import FinancialLossPolicy, SeverityPolicy
@@ -276,25 +278,53 @@ def run_csv_dataset_scan(
     )
 
     with console.status("[bold green]Loading and parsing CSV telemetry..."):
-        df = pl.read_csv(str(file_path))
+        df = pl.read_csv(str(file_path), infer_schema_length=10000)
 
     total_rows = df.height
     all_inverters = df["SOURCE_KEY"].unique().to_list()
 
-    # Default to affected devices if not specified
-    if not target_devices:
-        target_devices = ["1IF53ai7Xc0U56Y", "7JYdWkrLSPkdwr4", "3PZuoBAID5Wc2HD", "1BY6WEcLGh8j5v7"]
-
-    # Filter to requested devices
-    active_devices = [d for d in target_devices if d in all_inverters]
-    if not active_devices:
-        active_devices = all_inverters[:4]
+    # Determine active devices
+    if all_devices:
+        active_devices = all_inverters
+    elif target_devices:
+        active_devices = [d for d in target_devices if d in all_inverters]
+        if not active_devices:
+            active_devices = all_inverters[:4]
+    else:
+        # Default to affected devices if not specified
+        default_devs = ["1IF53ai7Xc0U56Y", "7JYdWkrLSPkdwr4", "3PZuoBAID5Wc2HD", "1BY6WEcLGh8j5v7"]
+        active_devices = [d for d in default_devs if d in all_inverters]
+        if not active_devices:
+            active_devices = all_inverters[:4]
 
     console.print(
         f"• Total Rows: [bold]{total_rows:,}[/bold]\n"
         f"• Inverters in file: [bold]{len(all_inverters)}[/bold]\n"
         f"• Scanning target devices: [bold yellow]{', '.join(active_devices)}[/bold yellow]\n"
     )
+
+    # Load weather data if provided
+    weather_irr: Optional[Dict[datetime, float]] = None
+    if weather_path:
+        w_path = Path(weather_path).resolve()
+        if w_path.exists():
+            console.print(f"• Weather Dataset: [cyan]{w_path.name}[/cyan] ({w_path})")
+            w_df = pl.read_csv(str(w_path), infer_schema_length=10000)
+            weather_irr = {}
+            for r in w_df.select(["DATE_TIME", "IRRADIATION"]).iter_rows():
+                dt_str = str(r[0]).strip()
+                try:
+                    ts = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
+                except Exception:
+                    try:
+                        ts = datetime.strptime(dt_str, "%d-%m-%Y %H:%M").replace(tzinfo=timezone.utc)
+                    except Exception:
+                        continue
+                irr = float(r[1]) if r[1] is not None else 0.0
+                weather_irr[ts] = irr * 1000.0 if irr <= 5.0 else irr
+            console.print(f"• Loaded [bold green]{len(weather_irr):,}[/bold green] weather irradiance reference timestamps.")
 
     # Load ground truth if available
     ground_truth_events = []
@@ -357,6 +387,7 @@ def run_csv_dataset_scan(
             rated_kw=1000.0,
             expected_pr=0.85,
             tariff_inr_per_kwh=tariff_inr,
+            irradiance_reference=weather_irr,
         )
 
         dev_candidates: List[DetectedAnomaly] = []
@@ -437,6 +468,7 @@ def main() -> None:
     parser.add_argument("--all-plants", "-a", action="store_true", help="Run scan across all plants")
     parser.add_argument("--demo", action="store_true", help="Run simulated test scenario showing detection, policies & dedup")
     parser.add_argument("--csv", type=str, default=None, help="Path to telemetry CSV dataset (e.g. Datasets/Surya-A-demo.csv)")
+    parser.add_argument("--weather", "-w-csv", type=str, default=None, help="Optional path to weather sensor CSV dataset (e.g. Datasets/Plant_1_Weather_Sensor_Data.csv)")
     parser.add_argument("--ground-truth", type=str, default=None, help="Path to ground truth JSON file")
     parser.add_argument("--detector", "-d", type=str, default=None, help="Specific detector(s) e.g. d1_statistical,d2_pr_deviation,trip,flatline,clipping,soiling")
     parser.add_argument("--all-devices", action="store_true", help="Scan all inverters in the CSV file")
@@ -449,18 +481,15 @@ def main() -> None:
     elif args.demo:
         run_demo_simulation()
     elif args.csv:
-        target_devs = None
-        if args.device:
-            target_devs = [args.device]
-        elif args.all_devices:
-            target_devs = None  # scanned inside
-
+        target_devs = [args.device] if args.device else None
         det_methods = [m.strip().lower() for m in args.detector.split(",")] if args.detector else None
 
         run_csv_dataset_scan(
             csv_path=args.csv,
+            weather_path=args.weather,
             ground_truth_path=args.ground_truth,
             target_devices=target_devs,
+            all_devices=args.all_devices,
             detector_methods=det_methods,
         )
     elif args.all_plants:

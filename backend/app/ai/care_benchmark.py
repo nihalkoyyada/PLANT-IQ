@@ -479,6 +479,7 @@ class CAREBenchmarkEngine:
 
         self.df: Optional[pl.DataFrame] = None
         self.weather_df: Optional[pl.DataFrame] = None
+        self.irradiance_reference: Dict[datetime, float] = {}
         self.ground_truth_events: List[GroundTruthEvent] = []
         self.devices: List[str] = []
         self.device_observations: Dict[str, List[Tuple[datetime, float]]] = {}
@@ -514,7 +515,7 @@ class CAREBenchmarkEngine:
             )
 
         # 2. Load Telemetry DataFrame
-        self.df = pl.read_csv(str(self.dataset_path))
+        self.df = pl.read_csv(str(self.dataset_path), infer_schema_length=10000)
         device_col = "SOURCE_KEY" if "SOURCE_KEY" in self.df.columns else "device_id"
         time_col = "DATE_TIME" if "DATE_TIME" in self.df.columns else "time"
         power_col = "AC_POWER" if "AC_POWER" in self.df.columns else "active_power"
@@ -545,9 +546,23 @@ class CAREBenchmarkEngine:
         self.all_timestamps = sorted(list(all_ts_set))
 
         # 4. Load Weather Data if available
+        self.irradiance_reference = {}
         if self.weather_path and self.weather_path.exists():
             try:
-                self.weather_df = pl.read_csv(str(self.weather_path))
+                self.weather_df = pl.read_csv(str(self.weather_path), infer_schema_length=10000)
+                w_time_col = "DATE_TIME" if "DATE_TIME" in self.weather_df.columns else "time"
+                w_irr_col = "IRRADIATION" if "IRRADIATION" in self.weather_df.columns else "irradiation"
+                if w_time_col in self.weather_df.columns and w_irr_col in self.weather_df.columns:
+                    for r in self.weather_df.select([w_time_col, w_irr_col]).iter_rows():
+                        w_ts = self._parse_timestamp(str(r[0]))
+                        if w_ts is None:
+                            continue
+                        try:
+                            irr_val = float(r[1]) if r[1] is not None else 0.0
+                        except (ValueError, TypeError):
+                            irr_val = 0.0
+                        # Convert kW/m² to W/m² if values <= 5.0
+                        self.irradiance_reference[w_ts] = irr_val * 1000.0 if irr_val <= 5.0 else irr_val
             except Exception:
                 self.weather_df = None
 
@@ -613,6 +628,7 @@ class CAREBenchmarkEngine:
                 rated_kw=self.rated_kw,
                 expected_pr=self.expected_pr,
                 tariff_inr_per_kwh=self.tariff_inr,
+                irradiance_reference=self.irradiance_reference if self.irradiance_reference else None,
             )
 
             cands = detector.detect(obs, parameters or {}, ctx)
@@ -665,6 +681,7 @@ class CAREBenchmarkEngine:
                     rated_kw=self.rated_kw,
                     expected_pr=self.expected_pr,
                     tariff_inr_per_kwh=self.tariff_inr,
+                    irradiance_reference=self.irradiance_reference if self.irradiance_reference else None,
                 )
                 cands = det.detect(obs, {}, ctx)
                 for c in cands:

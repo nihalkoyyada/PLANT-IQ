@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 from typing import List, Optional
 
@@ -178,6 +179,10 @@ def delete_detector(
 def run_detector(
     detector_id: UUID,
     window_hours: int = Query(default=24, ge=1, le=168),
+    is_backfill: bool = Query(default=False, description="Explicit historical backfill/replay mode"),
+    dry_run: bool = Query(default=False, description="Preview candidates without committing database changes"),
+    start_time: Optional[datetime] = Query(default=None, description="Explicit scan start time"),
+    end_time: Optional[datetime] = Query(default=None, description="Explicit scan end time"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "engineer")),
 ):
@@ -203,7 +208,107 @@ def run_detector(
         )
 
     detector_instance = DetectorRegistry.get(detector.method)
-    start_window = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+    from sqlalchemy import func
+    from app.ai.anomaly_service import AnomalyCalculationService
+
+    now_utc = datetime.now(timezone.utc)
+    max_ts = db.execute(
+        select(func.max(Reading.ts))
+        .join(Channel, Reading.channel_id == Channel.id)
+        .join(Asset, Channel.asset_id == Asset.id)
+        .where(Asset.plant_id == detector.plant_id)
+    ).scalar()
+    if max_ts and max_ts.tzinfo is None:
+        max_ts = max_ts.replace(tzinfo=timezone.utc)
+
+    # Telemetry data freshness & staleness check
+    is_stale = False
+    stale_days = None
+    if max_ts:
+        stale_days = (now_utc - max_ts).days
+        is_stale = stale_days > 7
+    else:
+        is_stale = True
+
+    # Window Selection:
+    if start_time is not None and end_time is not None:
+        start_window = start_time.replace(tzinfo=timezone.utc) if start_time.tzinfo is None else start_time
+        anchor_time = end_time.replace(tzinfo=timezone.utc) if end_time.tzinfo is None else end_time
+    elif is_backfill is True:
+        anchor_time = end_time if end_time is not None else (max_ts if max_ts else now_utc)
+        start_window = start_time if start_time is not None else (anchor_time - timedelta(hours=window_hours))
+    elif is_backfill is False:
+        if is_stale:
+            return {
+                "detector_id": str(detector_id),
+                "detector_name": detector.name,
+                "method": detector.method,
+                "status": "stale_data",
+                "data_freshness": "stale",
+                "latest_telemetry_ts": max_ts.isoformat() if max_ts else None,
+                "stale_days": stale_days,
+                "message": "Routine scan aborted: latest telemetry is older than 7 days. Use is_backfill=true to scan historical telemetry.",
+                "assets_scanned": 0,
+                "anomalies_detected": 0,
+                "anomalies_created": 0,
+                "anomalies_merged": 0,
+            }
+        anchor_time = now_utc
+        start_window = now_utc - timedelta(hours=window_hours)
+    else:
+        anchor_time = max_ts if (max_ts and (now_utc - max_ts).days > 7) else now_utc
+        start_window = anchor_time - timedelta(hours=window_hours)
+
+    # Fetch irradiance weather reference if available
+    irradiance_map = {}
+    weather_channel_keys = [
+        "irradiance_poa",
+        "poa_irradiance",
+        "irradiance_ghi",
+        "ghi_irradiance",
+        "irradiation",
+        "irradiance",
+        "weather_irradiance",
+    ]
+    weather_channels = (
+        db.execute(
+            select(Channel)
+            .join(Asset, Channel.asset_id == Asset.id)
+            .where(
+                Asset.plant_id == detector.plant_id,
+                Channel.canonical_key.in_(weather_channel_keys),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if weather_channels:
+        chosen_channel = None
+        for ch in weather_channels:
+            if "poa" in ch.canonical_key.lower():
+                chosen_channel = ch
+                break
+        if not chosen_channel:
+            chosen_channel = weather_channels[0]
+
+        irr_readings = (
+            db.execute(
+                select(Reading)
+                .where(
+                    Reading.channel_id == chosen_channel.id,
+                    Reading.ts >= start_window,
+                )
+                .order_by(Reading.ts.asc())
+            )
+            .scalars()
+            .all()
+        )
+        for r in irr_readings:
+            ts_utc = r.ts.replace(tzinfo=timezone.utc) if r.ts.tzinfo is None else r.ts
+            val = float(r.value)
+            if 0.0 < val <= 2.5 or (chosen_channel.receive_unit and "kw" in chosen_channel.receive_unit.lower()):
+                val *= 1000.0
+            irradiance_map[ts_utc] = val
 
     scope = detector.asset_scope or {}
     target_asset_type = scope.get("asset_type", "inverter")
@@ -251,6 +356,8 @@ def run_detector(
             continue
 
         observations = [(r.ts, float(r.value)) for r in readings]
+        asset_rated_kw = AnomalyCalculationService.resolve_asset_rated_kw(db, asset, detector.plant)
+
         context = DetectorContext(
             plant_id=detector.plant_id,
             asset_id=asset.id,
@@ -259,10 +366,13 @@ def run_detector(
             plant_name=detector.plant.name,
             asset_name=asset.name,
             asset_type=asset.asset_type,
-            rated_kw=asset.rated_kw,
+            rated_kw=asset_rated_kw,
             capacity_dc_kwp=detector.plant.capacity_dc_kwp,
             expected_pr=detector.plant.expected_pr or 0.80,
             tariff_inr_per_kwh=detector.plant.tariff_inr_per_kwh,
+            irradiance_reference=irradiance_map,
+            latitude=detector.plant.latitude,
+            longitude=detector.plant.longitude,
         )
 
         evaluated_asset_ids.add(asset.id)
@@ -284,11 +394,19 @@ def run_detector(
             total_created += created
             total_merged += merged
 
+    if dry_run:
+        db.rollback()
+
     return {
         "detector_id": str(detector_id),
         "detector_name": detector.name,
         "method": detector.method,
-        "status": "success",
+        "status": "dry_run" if dry_run else "success",
+        "is_dry_run": dry_run,
+        "data_freshness": "stale" if is_stale else "fresh",
+        "latest_telemetry_ts": max_ts.isoformat() if max_ts else None,
+        "scan_start": start_window.isoformat(),
+        "scan_end": anchor_time.isoformat(),
         "assets_scanned": len(evaluated_asset_ids),
         "anomalies_detected": total_detected,
         "anomalies_created": total_created,

@@ -83,6 +83,24 @@ class Settings(BaseSettings):
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
 
+    # AI Copilot & LLM Configuration (§10.2, Task S5-AI-01)
+    LLM_PROVIDER: str = "mock"
+    LLM_MODEL: str = "mock-copilot-v1"
+    ANTHROPIC_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    LLM_BASE_URL: Optional[str] = None
+    MOCK_SIMULATE_ERROR: Optional[str] = None
+
+    # Public Showcase Demo Plant & Telemetry Freshness Configuration
+    DEMO_PLANT_ID: Optional[str] = Field(
+        default="d253760d-d8ad-4a18-b655-fc22a5222d59",
+        validation_alias=AliasChoices("DEMO_PLANT_ID", "SHOWCASE_PLANT_ID"),
+    )
+    TELEMETRY_FRESHNESS_THRESHOLD_HOURS: float = Field(
+        default=24.0,
+        validation_alias=AliasChoices("TELEMETRY_FRESHNESS_THRESHOLD_HOURS", "TELEMETRY_STALE_HOURS"),
+    )
+
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",

@@ -246,7 +246,10 @@ def get_pr_heatmap(
 
     ac_chan_map = {c.asset_id: c for c in ac_channels}
     dc_chan_map = {c.asset_id: c for c in dc_channels}
-    poa_channel = poa_channels[0] if poa_channels else None
+    poa_channel = None
+    if poa_channels:
+        ws_poa = [c for c in poa_channels if c.asset and c.asset.asset_type == "weather_station"]
+        poa_channel = ws_poa[0] if ws_poa else poa_channels[0]
 
     all_chan_ids = list(set([c.id for c in ac_channels] + [c.id for c in dc_channels] + ([poa_channel.id] if poa_channel else [])))
 
@@ -511,7 +514,10 @@ def get_top_losers(
 
     ac_chan_map = {c.asset_id: c for c in ac_channels}
     dc_chan_map = {c.asset_id: c for c in dc_channels}
-    poa_channel = poa_channels[0] if poa_channels else None
+    poa_channel = None
+    if poa_channels:
+        ws_poa = [c for c in poa_channels if c.asset and c.asset.asset_type == "weather_station"]
+        poa_channel = ws_poa[0] if ws_poa else poa_channels[0]
 
     all_chan_ids = list(set([c.id for c in ac_channels] + [c.id for c in dc_channels] + ([poa_channel.id] if poa_channel else [])))
 

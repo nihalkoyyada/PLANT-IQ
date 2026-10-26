@@ -33,6 +33,97 @@ def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
     return dt
 
 
+FAULT_MECHANISM_FAMILIES: Dict[str, str] = {
+    # Inverter power deficit & outage mechanisms (all observe inverter active power deficit)
+    "trip": "inverter_generation_deficit",
+    "inverter_trip": "inverter_generation_deficit",
+    "pr_deviation": "inverter_generation_deficit",
+    "d2_pr_deviation": "inverter_generation_deficit",
+    "deviation": "inverter_generation_deficit",
+    "statistical": "inverter_generation_deficit",
+    "d1_statistical": "inverter_generation_deficit",
+    "zscore": "inverter_generation_deficit",
+    "iqr": "inverter_generation_deficit",
+    "isolation_forest": "inverter_generation_deficit",
+    "d4_isolation_forest": "inverter_generation_deficit",
+    "irradiance_residual": "inverter_generation_deficit",
+    "d3_irradiance_residual": "inverter_generation_deficit",
+
+    # Sensor frozen/stuck telemetry
+    "flatline": "sensor_flatline",
+    "frozen": "sensor_flatline",
+
+    # Inverter AC power saturation limiting
+    "clipping": "inverter_clipping",
+    "inverter_clipping": "inverter_clipping",
+
+    # Panel soiling
+    "soiling": "panel_soiling",
+}
+
+
+def get_canonical_fault_mechanism(detector_type: Optional[str]) -> str:
+    """Resolve normalized physical fault category for cross-detector identity."""
+    if not detector_type:
+        return "unknown"
+    dt = str(detector_type).lower().strip()
+    for pattern, family in FAULT_MECHANISM_FAMILIES.items():
+        if pattern in dt:
+            return family
+    return dt
+
+
+def normalize_detector_type(detector_type: Optional[str]) -> str:
+    """Normalize algorithm / detector type strings to canonical fault categories."""
+    return get_canonical_fault_mechanism(detector_type)
+
+
+def is_same_fault_mechanism(
+    existing_detector_id: Optional[UUID],
+    cand_detector_id: Optional[UUID],
+    existing_method: Optional[str],
+    cand_method: Optional[str],
+) -> bool:
+    """Determine whether an existing anomaly and candidate represent the same physical fault mechanism.
+    
+    Canonical identity is based on the underlying fault mechanism family, not arbitrary detector IDs
+    or detector labels. Cross-detector observations of the same fault (e.g. trip and PR deviation)
+    are recognized as the same physical mechanism.
+    """
+    fam_exist = get_canonical_fault_mechanism(existing_method)
+    fam_cand = get_canonical_fault_mechanism(cand_method)
+
+    # If existing method is generic ("detector", "unknown"), allow match for backward compatibility
+    if fam_exist in ("detector", "unknown") or fam_cand in ("detector", "unknown"):
+        return True
+
+    return fam_exist == fam_cand
+
+
+def compute_event_fingerprint(
+    plant_id: UUID,
+    asset_id: Optional[UUID],
+    detector_type: str,
+    start_time: datetime,
+    channel_id: Optional[UUID] = None,
+    canonical_key: Optional[str] = None,
+    end_time: Optional[datetime] = None,
+) -> str:
+    """Generate a deterministic, canonical logical-event fingerprint.
+    
+    Uses canonical fault mechanism family and event operating window so multiple
+    detectors observing the same fault on the same asset produce the exact same fingerprint.
+    """
+    import hashlib
+    ts_utc = _ensure_utc(start_time)
+    date_str = ts_utc.strftime("%Y%m%d")
+    norm_family = get_canonical_fault_mechanism(detector_type)
+    key_part = canonical_key or (str(channel_id)[:8] if channel_id else "power")
+    raw = f"{plant_id}:{asset_id or 'none'}:{key_part}:{norm_family}:{date_str}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
+
+
+
 def find_matching_anomaly(
     db: Session,
     plant_id: UUID,
@@ -96,20 +187,51 @@ def find_matching_anomaly(
     cand_end = _ensure_utc(candidate.end_time)
 
     # Pass 1: Exact start_time and end_time match (idempotent re-scan of identical interval)
+    # First priority: exact window AND same fault mechanism
+    for existing in existing_anomalies:
+        ext_start = _ensure_utc(existing.start_time)
+        ext_end = _ensure_utc(existing.end_time or existing.start_time)
+        if ext_start == cand_start and ext_end == cand_end:
+            if is_same_fault_mechanism(
+                existing.detector_id,
+                detector_id,
+                (existing.details or {}).get("detector_method") or existing.source,
+                candidate.anomaly_type,
+            ):
+                return existing
+
+    # Second priority: exact window re-scan regardless of detector label (prevent duplicate interval flooding)
     for existing in existing_anomalies:
         ext_start = _ensure_utc(existing.start_time)
         ext_end = _ensure_utc(existing.end_time or existing.start_time)
         if ext_start == cand_start and ext_end == cand_end:
             return existing
 
-    # Pass 2: Exact start_time match (re-scan of ongoing interval)
+    # Pass 2: Enclosing or contained window match with same fault mechanism
     for existing in existing_anomalies:
+        if not is_same_fault_mechanism(
+            existing.detector_id,
+            detector_id,
+            (existing.details or {}).get("detector_method") or existing.source,
+            candidate.anomaly_type,
+        ):
+            continue
         ext_start = _ensure_utc(existing.start_time)
-        if ext_start == cand_start:
+        ext_end = _ensure_utc(existing.end_time or existing.start_time)
+        is_enclosing = (cand_start <= ext_start + tolerance and cand_end >= ext_end - tolerance)
+        is_contained = (cand_start >= ext_start - tolerance and cand_end <= ext_end + tolerance)
+        if is_enclosing or is_contained:
             return existing
 
     # Pass 3: Active continuation / overlap for 'open' or 'acknowledged' anomalies
     for existing in existing_anomalies:
+        if not is_same_fault_mechanism(
+            existing.detector_id,
+            detector_id,
+            (existing.details or {}).get("detector_method") or existing.source,
+            candidate.anomaly_type,
+        ):
+            continue
         if existing.status in ("open", "acknowledged"):
             ext_start = _ensure_utc(existing.start_time)
             ext_end = _ensure_utc(existing.end_time or existing.start_time)
@@ -119,10 +241,18 @@ def find_matching_anomaly(
 
     # Pass 4: Covered historical re-scan for 'resolved' / 'false_positive' anomalies
     for existing in existing_anomalies:
+        if not is_same_fault_mechanism(
+            existing.detector_id,
+            detector_id,
+            (existing.details or {}).get("detector_method") or existing.source,
+            candidate.anomaly_type,
+        ):
+            continue
         if existing.status in ("resolved", "false_positive"):
             ext_start = _ensure_utc(existing.start_time)
             ext_end = _ensure_utc(existing.end_time or existing.start_time)
-            if cand_start >= (ext_start - timedelta(minutes=15)) and cand_end <= (ext_end + timedelta(minutes=15)):
+            overlaps = (cand_start <= ext_end + tolerance) and (cand_end >= ext_start - tolerance)
+            if overlaps:
                 return existing
 
     return None
@@ -286,8 +416,15 @@ def merge_or_create_anomaly(
         ext_start = _ensure_utc(existing.start_time)
         ext_end = _ensure_utc(existing.end_time or existing.start_time)
 
-        # 1. Closed status check: If resolved or false positive and candidate is covered, preserve status
-        if existing.status in ("resolved", "false_positive") and cand_start >= (ext_start - timedelta(minutes=15)) and cand_end <= (ext_end + timedelta(minutes=15)):
+        # 1. Closed status check: If resolved or false positive, preserve status without resurrecting
+        if existing.status in ("resolved", "false_positive"):
+            details = dict(existing.details or {})
+            contributing = list(details.get("contributing_detectors") or [])
+            if candidate.anomaly_type and candidate.anomaly_type not in contributing:
+                contributing.append(candidate.anomaly_type)
+            details["contributing_detectors"] = contributing
+            existing.details = details
+            db.flush()
             return existing, "merged"
 
         # 2. Preserve operator status and audit fields:
@@ -302,7 +439,9 @@ def merge_or_create_anomaly(
         is_exact_rescan = (cand_start == ext_start and cand_end == ext_end) or (cand_start >= ext_start and cand_end <= ext_end)
         is_extension = cand_end > ext_end
 
+        new_start_time = min(ext_start, cand_start)
         new_end_time = max(ext_end, cand_end)
+        existing.start_time = new_start_time
         existing.end_time = new_end_time
         existing.score = max(existing.score, candidate.score)
 
@@ -323,7 +462,7 @@ def merge_or_create_anomaly(
             existing.estimated_loss_kw = rated_kw
 
         # Cumulative energy loss
-        total_duration_hours = max(0.25, (new_end_time - ext_start).total_seconds() / 3600.0)
+        total_duration_hours = max(0.25, (new_end_time - new_start_time).total_seconds() / 3600.0)
         max_physical_kwh = rated_kw * total_duration_hours
 
         details = dict(existing.details or {})
@@ -349,8 +488,29 @@ def merge_or_create_anomaly(
         formatted_loss = f"₹{new_total_inr:,.2f}" if new_total_inr is not None else "N/A"
         formatted_energy = f"{new_total_kwh:,.1f} kWh"
 
+        contributing = list(details.get("contributing_detectors") or [])
+        if candidate.anomaly_type and candidate.anomaly_type not in contributing:
+            contributing.append(candidate.anomaly_type)
+
+        primary_method = details.get("detector_method")
+        if candidate.anomaly_type == "trip" or not primary_method:
+            primary_method = candidate.anomaly_type
+
+        canonical_fp = compute_event_fingerprint(
+            plant_id=existing.plant_id,
+            asset_id=existing.asset_id,
+            detector_type=primary_method,
+            start_time=existing.start_time,
+            channel_id=existing.channel_id,
+            canonical_key=context.canonical_key,
+            end_time=existing.end_time,
+        )
+
         details.update(
             {
+                "event_fingerprint": canonical_fp,
+                "detector_method": primary_method,
+                "contributing_detectors": contributing,
                 "total_energy_loss_kwh": new_total_kwh,
                 "total_financial_loss_inr": new_total_inr,
                 "merged_events_count": merged_count,
@@ -371,7 +531,7 @@ def merge_or_create_anomaly(
             status_prefix = "Acknowledged" if existing.status == "acknowledged" else ("Resolved" if existing.status == "resolved" else "Ongoing")
             inr_str = f" (~{formatted_loss})" if new_total_inr is not None else ""
             existing.summary = (
-                f"{status_prefix} {existing.severity.upper()} {candidate.anomaly_type} anomaly on "
+                f"{status_prefix} {existing.severity.upper()} {primary_method} anomaly on "
                 f"{context.asset_name or 'Asset'}: total loss {formatted_energy}{inr_str} "
                 f"across {merged_count} consecutive intervals."
             )
@@ -380,6 +540,7 @@ def merge_or_create_anomaly(
         AnomalyCalculationService.recalculate_anomaly_record(db, existing)
         recalculated_details = dict(existing.details or {})
         recalculated_details["merged_events_count"] = merged_count
+        recalculated_details["contributing_detectors"] = contributing
         existing.details = recalculated_details
 
         # Synchronize linked event in events table
@@ -395,20 +556,38 @@ def merge_or_create_anomaly(
             Anomaly.asset_id == context.asset_id,
             Anomaly.start_time == candidate.start_time,
         )
-    ).scalars().first()
-    if colliding is not None:
-        return merge_or_create_anomaly(
-            db=db,
-            candidate=candidate,
-            context=context,
-            detector_id=detector_id,
-            continuation_tolerance_minutes=continuation_tolerance_minutes,
-        )
+    ).scalars().all()
+    for coll in colliding:
+        if is_same_fault_mechanism(
+            coll.detector_id,
+            detector_id,
+            (coll.details or {}).get("detector_method") or coll.source,
+            candidate.anomaly_type,
+        ):
+            return merge_or_create_anomaly(
+                db=db,
+                candidate=candidate,
+                context=context,
+                detector_id=detector_id,
+                continuation_tolerance_minutes=continuation_tolerance_minutes,
+            )
 
     # Create new Anomaly record
     details = dict(candidate.details or {})
+    fingerprint = compute_event_fingerprint(
+        plant_id=context.plant_id,
+        asset_id=context.asset_id,
+        detector_type=candidate.anomaly_type,
+        start_time=candidate.start_time,
+        channel_id=context.channel_id,
+        canonical_key=context.canonical_key,
+        end_time=candidate.end_time,
+    )
     details.update(
         {
+            "event_fingerprint": fingerprint,
+            "detector_method": candidate.anomaly_type,
+            "contributing_detectors": [candidate.anomaly_type],
             "total_energy_loss_kwh": financial_assessment.energy_loss_kwh,
             "total_financial_loss_inr": financial_assessment.financial_loss_inr,
             "effective_tariff_inr": financial_assessment.effective_tariff_inr,

@@ -265,6 +265,119 @@ def integrate_power_deficit(
     return round(peak_deficit_kw, 3), round(avg_deficit_kw, 3), round(total_kwh, 3)
 
 
+def calculate_solar_position(
+    dt: datetime,
+    latitude: float,
+    longitude: float,
+) -> Tuple[float, float, float]:
+    """Calculate solar position angles (cos_zenith, zenith_degrees, elevation_degrees).
+
+    Uses astronomical solar equations accounting for declination, equation of time,
+    local solar time, and hour angle.
+    """
+    if dt.tzinfo is None:
+        dt_utc = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt_utc = dt.astimezone(timezone.utc)
+
+    # Day of year N (1 to 366)
+    n = dt_utc.timetuple().tm_yday
+
+    # Solar declination angle delta (degrees) via Cooper formula
+    delta_deg = 23.45 * math.sin(math.radians((360.0 / 365.0) * (284 + n)))
+    delta_rad = math.radians(delta_deg)
+
+    # Equation of Time EoT (minutes)
+    b_rad = math.radians((360.0 / 365.0) * (n - 81))
+    eot_min = 9.87 * math.sin(2 * b_rad) - 7.53 * math.cos(b_rad) - 1.5 * math.sin(b_rad)
+
+    # Decimal hours in UTC
+    utc_hours = dt_utc.hour + (dt_utc.minute / 60.0) + (dt_utc.second / 3600.0)
+
+    # Local Solar Time (LST) in hours
+    lst_hours = (utc_hours + (longitude / 15.0) + (eot_min / 60.0)) % 24.0
+
+    # Solar hour angle omega (degrees): 15 deg per hour from solar noon (12:00)
+    omega_deg = 15.0 * (lst_hours - 12.0)
+    omega_rad = math.radians(omega_deg)
+
+    lat_rad = math.radians(latitude)
+
+    # cos(zenith) = sin(lat)*sin(delta) + cos(lat)*cos(delta)*cos(omega)
+    cos_zenith = math.sin(lat_rad) * math.sin(delta_rad) + math.cos(lat_rad) * math.cos(delta_rad) * math.cos(omega_rad)
+
+    if cos_zenith <= 0.0:
+        return 0.0, 90.0, 0.0
+
+    cos_zenith = min(1.0, max(0.0, cos_zenith))
+    zenith_deg = math.degrees(math.acos(cos_zenith))
+    elevation_deg = max(0.0, 90.0 - zenith_deg)
+
+    return cos_zenith, zenith_deg, elevation_deg
+
+
+def calculate_clear_sky_irradiance(
+    dt: datetime,
+    latitude: float,
+    longitude: float,
+    solar_constant: float = 1098.0,
+) -> float:
+    """Calculate theoretical clear-sky Global Horizontal Irradiance (GHI in W/m²)."""
+    cos_zenith, _, _ = calculate_solar_position(dt, latitude, longitude)
+    if cos_zenith <= 0.01:
+        return 0.0
+
+    ghi_clear = solar_constant * cos_zenith * math.exp(-0.057 / cos_zenith)
+    return max(0.0, float(ghi_clear))
+
+
+def calculate_clear_sky_expected_power(
+    dt: datetime,
+    latitude: float,
+    longitude: float,
+    rated_kw: float = 1000.0,
+    expected_pr: float = 0.80,
+) -> float:
+    """Calculate theoretical expected clear-sky AC active power generation in kW."""
+    ghi_clear = calculate_clear_sky_irradiance(dt, latitude, longitude)
+    if ghi_clear <= 0.0:
+        return 0.0
+    p_clear = (ghi_clear / 1000.0) * rated_kw * expected_pr
+    return float(p_clear)
+
+
+def resolve_reference_irradiance(
+    ts: datetime,
+    irradiance_reference: Optional[Dict[datetime, float]],
+) -> Optional[float]:
+    """Safely match datetime to irradiance reference dictionary across tz variations and seconds."""
+    if not irradiance_reference:
+        return None
+    if ts in irradiance_reference:
+        return float(irradiance_reference[ts])
+
+    variants = [
+        ts.replace(tzinfo=None),
+        ts.replace(tzinfo=timezone.utc),
+        ts.replace(second=0, microsecond=0),
+        ts.replace(second=0, microsecond=0, tzinfo=None),
+        ts.replace(second=0, microsecond=0, tzinfo=timezone.utc),
+    ]
+    for v in variants:
+        if v in irradiance_reference:
+            return float(irradiance_reference[v])
+    return None
+
+
+def get_local_solar_hour(ts: datetime, context: DetectorContext) -> float:
+    """Calculate local solar hour (0.0 to 24.0) adjusting UTC datetime by solar longitude if present."""
+    hour = ts.hour + (ts.minute / 60.0) + (ts.second / 3600.0)
+    if context.longitude is not None:
+        solar_offset = context.longitude / 15.0
+        return (hour + solar_offset) % 24.0
+    return hour
+
+
 # =====================================================================
 # Built-in Algorithm: 1. D1: Statistical Outlier Detector ('d1_statistical', 'zscore', 'iqr')
 # =====================================================================
@@ -631,25 +744,38 @@ class D2PRDeviationDetector(BaseDetector):
             expected_kw = 0.0
             actual_pr = None
 
-            if context.irradiance_reference and ts in context.irradiance_reference:
-                poa = float(context.irradiance_reference[ts])
-                if poa >= min_poa:
+            ref_poa = resolve_reference_irradiance(ts, context.irradiance_reference)
+
+            if ref_poa is not None:
+                # Normalize kW/m² to W/m² if value <= 2.5
+                if 0.0 < ref_poa <= 2.5:
+                    ref_poa *= 1000.0
+                if ref_poa >= min_poa:
                     irradiance_used = True
                     # PR = (P / P_rated) / (G_poa / 1000)
-                    expected_kw = (poa / 1000.0) * rated_kw * expected_pr
+                    expected_kw = (ref_poa / 1000.0) * rated_kw * expected_pr
                     if not np.isnan(actual_val) and actual_val >= 0:
-                        actual_pr = (actual_val / rated_kw) / (poa / 1000.0)
+                        actual_pr = (actual_val / rated_kw) / (ref_poa / 1000.0)
             else:
-                # Fallback: estimate from diurnal clear-sky envelope (06:00 to 18:30)
-                hour = ts.hour + (ts.minute / 60.0)
-                if 6.0 <= hour <= 18.5:
-                    solar_factor = math.sin((hour - 6.0) / 12.5 * math.pi)
-                    if solar_factor > 0.05:
-                        expected_kw = rated_kw * 0.85 * solar_factor * expected_pr
-                        if not np.isnan(actual_val) and actual_val >= 0 and expected_kw > 0:
-                            actual_pr = (actual_val / expected_kw) * expected_pr
+                # Fallback: estimate from physical clear-sky solar model when coordinates are known,
+                # or local solar hour based on longitude/timezone to avoid UTC nighttime false positives
+                if context.latitude is not None and context.longitude is not None:
+                    expected_kw = calculate_clear_sky_expected_power(
+                        ts, context.latitude, context.longitude, rated_kw=rated_kw, expected_pr=expected_pr
+                    )
+                    if not np.isnan(actual_val) and actual_val >= 0 and expected_kw > 0:
+                        actual_pr = (actual_val / expected_kw) * expected_pr
                 else:
-                    expected_kw = 0.0
+                    local_solar_hour = get_local_solar_hour(ts, context)
+                    # Apply shoulder-hour ramp-up and ramp-down dampening to prevent false positives at sunrise/sunset
+                    if 6.0 <= local_solar_hour <= 18.5:
+                        solar_factor = math.sin((local_solar_hour - 6.0) / 12.5 * math.pi)
+                        if solar_factor > 0.05:
+                            expected_kw = rated_kw * 0.85 * solar_factor * expected_pr
+                            if not np.isnan(actual_val) and actual_val >= 0 and expected_kw > 0:
+                                actual_pr = (actual_val / expected_kw) * expected_pr
+                    else:
+                        expected_kw = 0.0
 
             expected_series.append(expected_kw)
             actual_pr_series.append(actual_pr)
@@ -680,8 +806,11 @@ class D2PRDeviationDetector(BaseDetector):
         distinct_days_with_deficit = len(set(ts_list[i].date() for i in anom_indices))
         is_multi_day = distinct_days_with_deficit >= 2
 
+        min_consecutive = int(parameters.get("min_consecutive", 2))
         anomalies: List[DetectedAnomaly] = []
         for span in grouped_spans:
+            if len(span) < min_consecutive:
+                continue
             start_ts = ts_list[span[0]]
             end_ts = ts_list[span[-1]]
             actual_vals = val_arr[span]
@@ -771,98 +900,6 @@ class DeviationDetector(D2PRDeviationDetector):
 # =====================================================================
 # Built-in Algorithm: 3. D3: Irradiance-Residual Detector ('d3_irradiance_residual')
 # =====================================================================
-def calculate_solar_position(
-    dt: datetime,
-    latitude: float,
-    longitude: float,
-) -> Tuple[float, float, float]:
-    """Calculate solar position angles (cos_zenith, zenith_degrees, elevation_degrees).
-
-    Uses astronomical solar equations accounting for declination, equation of time,
-    local solar time, and hour angle.
-
-    Args:
-        dt: Datetime object. If naive, assumed UTC.
-        latitude: Geographic latitude in decimal degrees (-90 to +90).
-        longitude: Geographic longitude in decimal degrees (-180 to +180).
-
-    Returns:
-        (cos_zenith, zenith_deg, elevation_deg)
-    """
-    if dt.tzinfo is None:
-        dt_utc = dt.replace(tzinfo=timezone.utc)
-    else:
-        dt_utc = dt.astimezone(timezone.utc)
-
-    # Day of year N (1 to 366)
-    n = dt_utc.timetuple().tm_yday
-
-    # Solar declination angle delta (degrees) via Cooper formula
-    delta_deg = 23.45 * math.sin(math.radians((360.0 / 365.0) * (284 + n)))
-    delta_rad = math.radians(delta_deg)
-
-    # Equation of Time EoT (minutes)
-    b_rad = math.radians((360.0 / 365.0) * (n - 81))
-    eot_min = 9.87 * math.sin(2 * b_rad) - 7.53 * math.cos(b_rad) - 1.5 * math.sin(b_rad)
-
-    # Decimal hours in UTC
-    utc_hours = dt_utc.hour + (dt_utc.minute / 60.0) + (dt_utc.second / 3600.0)
-
-    # Local Solar Time (LST) in hours
-    lst_hours = (utc_hours + (longitude / 15.0) + (eot_min / 60.0)) % 24.0
-
-    # Solar hour angle omega (degrees): 15 deg per hour from solar noon (12:00)
-    omega_deg = 15.0 * (lst_hours - 12.0)
-    omega_rad = math.radians(omega_deg)
-
-    lat_rad = math.radians(latitude)
-
-    # cos(zenith) = sin(lat)*sin(delta) + cos(lat)*cos(delta)*cos(omega)
-    cos_zenith = math.sin(lat_rad) * math.sin(delta_rad) + math.cos(lat_rad) * math.cos(delta_rad) * math.cos(omega_rad)
-
-    if cos_zenith <= 0.0:
-        return 0.0, 90.0, 0.0
-
-    cos_zenith = min(1.0, max(0.0, cos_zenith))
-    zenith_deg = math.degrees(math.acos(cos_zenith))
-    elevation_deg = max(0.0, 90.0 - zenith_deg)
-
-    return cos_zenith, zenith_deg, elevation_deg
-
-
-def calculate_clear_sky_irradiance(
-    dt: datetime,
-    latitude: float,
-    longitude: float,
-    solar_constant: float = 1098.0,
-) -> float:
-    """Calculate theoretical clear-sky Global Horizontal Irradiance (GHI in W/m²).
-
-    Implements the Haurwitz clear-sky solar radiation model:
-        GHI_clear = 1098 * cos(theta_z) * exp(-0.057 / cos(theta_z))  [for cos(theta_z) > 0.01]
-    Yields realistic diurnal irradiance curves with peak ~1000 W/m² under clear skies.
-    """
-    cos_zenith, _, _ = calculate_solar_position(dt, latitude, longitude)
-    if cos_zenith <= 0.01:
-        return 0.0
-
-    ghi_clear = solar_constant * cos_zenith * math.exp(-0.057 / cos_zenith)
-    return max(0.0, float(ghi_clear))
-
-
-def calculate_clear_sky_expected_power(
-    dt: datetime,
-    latitude: float,
-    longitude: float,
-    rated_kw: float = 1000.0,
-    expected_pr: float = 0.80,
-) -> float:
-    """Calculate theoretical expected clear-sky AC active power generation in kW."""
-    ghi_clear = calculate_clear_sky_irradiance(dt, latitude, longitude)
-    if ghi_clear <= 0.0:
-        return 0.0
-    p_clear = (ghi_clear / 1000.0) * rated_kw * expected_pr
-    return float(p_clear)
 
 
 @register_detector(
@@ -908,7 +945,7 @@ class D3IrradianceResidualDetector(BaseDetector):
         min_consecutive = int(parameters.get("min_consecutive", 2))
 
         is_irradiance_channel = context.canonical_key in (
-            "poa_irradiance", "ghi_irradiance", "irradiation", "irradiance", "weather_irradiance"
+            "irradiance_poa", "poa_irradiance", "irradiance_ghi", "ghi_irradiance", "irradiation", "irradiance", "weather_irradiance"
         )
 
         ts_list = [obs[0] for obs in observations]
@@ -947,20 +984,31 @@ class D3IrradianceResidualDetector(BaseDetector):
             x_clear = clearsky_baseline[i]
             y_act = val_arr[i]
 
-            if has_pyranometer_ref and ts in context.irradiance_reference:
-                meas_ghi = float(context.irradiance_reference[ts])
+            ref_ghi = None
+            if has_pyranometer_ref and context.irradiance_reference:
+                if ts in context.irradiance_reference:
+                    ref_ghi = float(context.irradiance_reference[ts])
+                else:
+                    ts_alt = ts.replace(tzinfo=None) if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+                    if ts_alt in context.irradiance_reference:
+                        ref_ghi = float(context.irradiance_reference[ts_alt])
+
+            if ref_ghi is not None:
+                meas_ghi = ref_ghi
+                if 0.0 < meas_ghi <= 2.5:
+                    meas_ghi *= 1000.0
                 c_ghi = clearsky_ghi[i]
                 if c_ghi > 50.0:
                     clearness_ratio = meas_ghi / c_ghi
-                    # Weather pyranometer indicates heavy cloud cover
-                    if clearness_ratio < 0.65:
+                    # Weather pyranometer indicates cloud cover or atmospheric attenuation
+                    if clearness_ratio < 0.90:
                         expected_cloud_power = (meas_ghi / 1000.0) * rated_kw * expected_pr
                         # If actual power tracks the lower pyranometer irradiance, it's natural cloud cover
                         if not is_irradiance_channel:
-                            if abs(y_act - expected_cloud_power) <= max(15.0, expected_cloud_power * 0.35):
+                            if abs(y_act - expected_cloud_power) <= max(25.0, expected_cloud_power * 0.35):
                                 cloud_attenuation_mask[i] = True
-                            elif y_act >= expected_cloud_power * 1.4 and meas_ghi < c_ghi * 0.4:
-                                # Inverter generating well but pyranometer reads very low -> pyranometer obstruction!
+                            elif y_act >= expected_cloud_power * 1.75 and meas_ghi <= c_ghi * 0.4:
+                                # Inverter generating far above pyranometer irradiance (>1.75x) -> pyranometer obstruction!
                                 sensor_obstruction_mask[i] = True
                         else:
                             # It's an irradiance channel itself
@@ -1227,15 +1275,32 @@ def extract_per_asset_telemetry_features(
         val = val_arr[i]
         h = ts.hour + (ts.minute / 60.0) + (ts.second / 3600.0)
 
-        # Expected clear-sky power
-        if is_power_channel:
-            exp_p = calculate_clear_sky_expected_power(ts, latitude, longitude, rated_kw=rated_kw, expected_pr=expected_pr)
-        else:
-            exp_p = calculate_clear_sky_irradiance(ts, latitude, longitude)
+        ref_irr = None
+        if context.irradiance_reference:
+            if ts in context.irradiance_reference:
+                ref_irr = float(context.irradiance_reference[ts])
+            else:
+                ts_alt = ts.replace(tzinfo=None) if ts.tzinfo is not None else ts.replace(tzinfo=timezone.utc)
+                if ts_alt in context.irradiance_reference:
+                    ref_irr = float(context.irradiance_reference[ts_alt])
 
-        # Fallback to moving daylight envelope if astronomical model is not aligned with timestamps
-        if exp_p <= 5.0 and val > 10.0:
-            exp_p = rated_kw * 0.80
+        if ref_irr is not None:
+            if 0.0 < ref_irr <= 2.5:
+                ref_irr *= 1000.0
+            if is_power_channel:
+                exp_p = (ref_irr / 1000.0) * rated_kw * expected_pr
+            else:
+                exp_p = ref_irr
+        else:
+            # Expected clear-sky power fallback
+            if is_power_channel:
+                exp_p = calculate_clear_sky_expected_power(ts, latitude, longitude, rated_kw=rated_kw, expected_pr=expected_pr)
+            else:
+                exp_p = calculate_clear_sky_irradiance(ts, latitude, longitude)
+
+            # Fallback to moving daylight envelope if astronomical model is not aligned with timestamps
+            if exp_p <= 5.0 and val > 10.0:
+                exp_p = rated_kw * 0.80
 
         expected_baselines[i] = exp_p
 
@@ -1538,13 +1603,22 @@ class TripDetector(BaseDetector):
 
         trip_indices: List[int] = []
         for i, (ts, val) in enumerate(observations):
-            if min_midday_hour <= ts.hour <= max_midday_hour:
-                is_sunlight = True
-                if context.irradiance_reference and ts in context.irradiance_reference:
-                    is_sunlight = context.irradiance_reference[ts] > 100.0
+            solar_hr = get_local_solar_hour(ts, context)
+            ref_poa = resolve_reference_irradiance(ts, context.irradiance_reference)
+            if ref_poa is not None and 0.0 < ref_poa <= 2.5:
+                ref_poa *= 1000.0
 
-                if is_sunlight and val <= 0.1:
-                    trip_indices.append(i)
+            is_sunlight = False
+            if ref_poa is not None:
+                is_sunlight = ref_poa >= 100.0  # Measured daylight POA
+            elif context.latitude is not None and context.longitude is not None:
+                ghi_clear = calculate_clear_sky_irradiance(ts, context.latitude, context.longitude)
+                is_sunlight = ghi_clear >= 150.0 and (9.0 <= solar_hr <= 16.5)
+            else:
+                is_sunlight = (min_midday_hour <= ts.hour <= max_midday_hour) or (min_midday_hour <= solar_hr <= max_midday_hour)
+
+            if is_sunlight and val <= 0.1:
+                trip_indices.append(i)
 
         if not trip_indices:
             return []
@@ -1741,7 +1815,8 @@ class ClippingDetector(BaseDetector):
                 return None
             start_ts = ts_list[indices[0]]
             end_ts = ts_list[indices[-1]]
-            if not (9 <= start_ts.hour <= 16):
+            solar_hr = get_local_solar_hour(start_ts, context)
+            if not (9 <= start_ts.hour <= 16 or 9.0 <= solar_hr <= 16.5):
                 return None
             dur_mins = int((len(indices) * cadence_seconds) / 60)
             hours = dur_mins / 60.0

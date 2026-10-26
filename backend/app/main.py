@@ -37,6 +37,13 @@ async def lifespan(app: FastAPI):
             if user_count == 0:
                 from scripts.seed_surya import seed_surya_data
                 seed_surya_data(session=session, reset=False)
+
+        # Ensure POA irradiance baseline telemetry is attached for solar PR calculations
+        try:
+            from scripts.remediate_poa_data import remediate_poa_data
+            remediate_poa_data()
+        except Exception as poa_err:
+            print(f"Note: POA baseline remediation on startup check: {poa_err}")
     except Exception as err:
         print(f"Warning: Baseline organization/user seeding on startup encountered note: {err}")
     yield

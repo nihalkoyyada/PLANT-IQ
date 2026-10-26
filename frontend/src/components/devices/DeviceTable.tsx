@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Search, ChevronRight } from 'lucide-react';
+import { Cpu, Search, ChevronRight, Sparkles } from 'lucide-react';
 import { Badge } from '../common/Badge';
 
 export interface DeviceItem {
@@ -39,9 +39,10 @@ const formatReadingTime = (tsStr?: string): string | null => {
 interface DeviceTableProps {
   devices: DeviceItem[];
   onSelectDevice: (device: DeviceItem) => void;
+  onAskCopilot?: (prompt: string) => void;
 }
 
-export const DeviceTable: React.FC<DeviceTableProps> = ({ devices, onSelectDevice }) => {
+export const DeviceTable: React.FC<DeviceTableProps> = ({ devices, onSelectDevice, onAskCopilot }) => {
   const [search, setSearch] = useState('');
 
   const filtered = devices.filter(
@@ -148,9 +149,27 @@ export const DeviceTable: React.FC<DeviceTableProps> = ({ devices, onSelectDevic
                     {dev.dailyYieldKwh !== undefined && dev.dailyYieldKwh !== null ? `${dev.dailyYieldKwh.toFixed(0)} kWh` : '---'}
                   </td>
                   <td className="py-3 px-3">
-                    <button className="p-1 rounded bg-slate-100 group-hover:bg-[#004874] group-hover:text-white transition">
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {onAskCopilot && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onAskCopilot(
+                              `Analyze performance and active power for ${dev.name} (${dev.sourceKey}). Status: ${dev.status}, AC: ${
+                                dev.acPowerKw !== undefined ? dev.acPowerKw.toFixed(1) + ' kW' : 'N/A'
+                              }. Check for clipping, tripping, or generation shortfall.`
+                            );
+                          }}
+                          title={`Analyze ${dev.name} with Solar Copilot`}
+                          className="p-1 rounded text-sky-600 hover:bg-sky-100 hover:text-sky-800 transition"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button className="p-1 rounded bg-slate-100 group-hover:bg-[#004874] group-hover:text-white transition">
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

@@ -11,6 +11,7 @@ Provides:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any, AsyncIterator, Dict, List, Optional
 from uuid import UUID
@@ -49,6 +50,7 @@ class CopilotChatRequest(BaseModel):
     prompt: str = Field(..., description="Natural-language question or instruction.")
     plant_id: UUID = Field(..., description="Target plant ID context.")
     conversation_id: Optional[UUID] = Field(None, description="Optional ID of existing conversation thread.")
+    client_message_id: Optional[UUID] = Field(None, description="Optional client message ID for request tracking and idempotency.")
 
 
 def _verify_plant_access(plant_id: UUID, current_user: User, db: Session) -> Plant:
@@ -113,14 +115,18 @@ async def stream_copilot(
     orchestrator = CopilotOrchestrator()
 
     async def sse_event_generator() -> AsyncIterator[str]:
-        async for event in orchestrator.stream(
-            prompt=request.prompt,
-            context=context,
-            session=db,
-            conversation_id=request.conversation_id,
-        ):
-            event_type = event.get("event", "message")
-            yield f"event: {event_type}\ndata: {json.dumps(event, default=str)}\n\n"
+        try:
+            async for event in orchestrator.stream(
+                prompt=request.prompt,
+                context=context,
+                session=db,
+                conversation_id=request.conversation_id,
+            ):
+                event_type = event.get("event", "message")
+                yield f"event: {event_type}\ndata: {json.dumps(event, default=str)}\n\n"
+        except asyncio.CancelledError:
+            # Client disconnected or cancelled request
+            pass
 
     return StreamingResponse(
         sse_event_generator(),
@@ -131,6 +137,27 @@ async def stream_copilot(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.get("/info")
+def get_copilot_info(
+    current_user: User = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Retrieve Copilot runtime provider status, model name, and tool capabilities."""
+    orchestrator = CopilotOrchestrator()
+    provider = orchestrator.provider
+    model_name = provider.model or "unknown"
+    is_mock = "mock" in model_name.lower() or provider.__class__.__name__ == "MockLLMProvider"
+
+    tool_names = default_tool_registry.list_tool_names()
+    return {
+        "provider": "mock" if is_mock else "live",
+        "provider_class": provider.__class__.__name__,
+        "model": model_name,
+        "is_mock": is_mock,
+        "tool_count": len(tool_names),
+        "tools": tool_names,
+    }
 
 
 @router.get("/conversations")

@@ -1224,6 +1224,12 @@ class Anomaly(Base):
             return self.details.get("root_cause")
         return None
 
+    @property
+    def event_fingerprint(self) -> Optional[str]:
+        if self.details and isinstance(self.details, dict):
+            return self.details.get("event_fingerprint")
+        return None
+
     __table_args__ = (
         CheckConstraint(
             "severity IN ('low', 'medium', 'high', 'critical')",

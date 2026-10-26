@@ -24,6 +24,7 @@ import {
   FileText,
   AlertCircle,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -82,7 +83,9 @@ const STATUS_CONFIG: Record<AnomalyStatus, { label: string; badge: string; text:
   false_positive: { label: 'False Positive', badge: 'bg-slate-100 text-slate-700 border-slate-200', text: 'text-slate-500' },
 };
 
-export const AnomaliesPage: React.FC = () => {
+export const AnomaliesPage: React.FC<{
+  onAskCopilot?: (prompt: string, context?: any) => void;
+}> = ({ onAskCopilot }) => {
   // Navigation / View Tabs: 'inbox' | 'detail' | 'alerts'
   const [activeView, setActiveView] = useState<'inbox' | 'detail' | 'alerts'>('inbox');
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
@@ -106,7 +109,7 @@ export const AnomaliesPage: React.FC = () => {
   // Filters
   const [filterPlant, setFilterPlant] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('open');
   const [filterDetector, setFilterDetector] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -213,6 +216,8 @@ export const AnomaliesPage: React.FC = () => {
   // Filtered anomalies by search query, with unresolved Critical/High anomalies prioritized
   const filteredAnomalies = useMemo(() => {
     const list = anomalies.filter((a) => {
+      // Exclude superseded duplicate records
+      if (a.details?.is_superseded) return false;
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -225,6 +230,15 @@ export const AnomaliesPage: React.FC = () => {
       );
     });
 
+    // Never display the same logical event twice in one view
+    const seenEventKeys = new Set<string>();
+    const uniqueList = list.filter((a) => {
+      const eventKey = a.details?.event_fingerprint || `${a.plant_id}:${a.asset_id || 'none'}:${a.start_time}:${a.details?.detector_method || a.source}`;
+      if (seenEventKeys.has(eventKey)) return false;
+      seenEventKeys.add(eventKey);
+      return true;
+    });
+
     const SEVERITY_RANK: Record<string, number> = {
       critical: 4,
       high: 3,
@@ -232,7 +246,7 @@ export const AnomaliesPage: React.FC = () => {
       low: 1,
     };
 
-    return [...list].sort((a, b) => {
+    return [...uniqueList].sort((a, b) => {
       const aUnresolved = a.status !== 'resolved' && a.status !== 'false_positive';
       const bUnresolved = b.status !== 'resolved' && b.status !== 'false_positive';
       const aCritHigh = a.severity === 'critical' || a.severity === 'high';
@@ -507,6 +521,31 @@ export const AnomaliesPage: React.FC = () => {
 
             {evidenceData && (
               <div className="flex items-center gap-2">
+                {onAskCopilot && (
+                  <button
+                    id="btn-detail-ask-copilot"
+                    onClick={() => {
+                      onAskCopilot(
+                        `Investigate ${evidenceData.severity.toUpperCase()} anomaly on ${
+                          evidenceData.asset_name || 'Inverter Asset'
+                        }: ${evidenceData.canonical_key || 'active_power'} outlier starting ${evidenceData.start_time}. Peak loss is ${
+                          evidenceData.estimated_loss_kw || 0
+                        } kW. Evaluate hypotheses and recommend maintenance actions.`,
+                        {
+                          route: 'anomalies',
+                          anomalyId: evidenceData.anomaly_id,
+                          anomalyTitle: evidenceData.detector_name || evidenceData.canonical_key || 'Detected Anomaly',
+                          assetId: evidenceData.asset_id || undefined,
+                          assetName: evidenceData.asset_name || undefined,
+                        }
+                      );
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-xs transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-sky-200" />
+                    <span>Ask Copilot</span>
+                  </button>
+                )}
                 <button
                   id="btn-detail-triage"
                   onClick={() => {
@@ -1104,16 +1143,43 @@ export const AnomaliesPage: React.FC = () => {
                             className="py-3 px-4 text-right whitespace-nowrap"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <button
-                              onClick={() => {
-                                setSelectedAnomalyId(anom.id);
-                                setActiveView('detail');
-                              }}
-                              className="text-xs text-[#004874] hover:text-[#002f4c] font-bold flex items-center gap-1 ml-auto"
-                            >
-                              <span>View Evidence</span>
-                              <ChevronRight className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {onAskCopilot && (
+                                <button
+                                  onClick={() => {
+                                    onAskCopilot(
+                                      `Investigate anomaly on ${anom.asset_name || 'inverter asset'}: ${
+                                        anom.summary || 'detected outlier'
+                                      } (${new Date(anom.start_time).toLocaleString()}). Severity: ${anom.severity.toUpperCase()}, Deficit: ${
+                                        anom.estimated_loss_kw || 0
+                                      } kW. Trace root causes and historical context.`,
+                                      {
+                                        route: 'anomalies',
+                                        anomalyId: anom.id,
+                                        anomalyTitle: anom.summary,
+                                        assetId: anom.asset_id,
+                                        assetName: anom.asset_name,
+                                      }
+                                    );
+                                  }}
+                                  className="text-xs text-sky-700 hover:text-sky-900 font-semibold flex items-center gap-1 px-2 py-1 rounded bg-sky-50 hover:bg-sky-100 border border-sky-200 transition"
+                                  title="Investigate Anomaly with Solar Copilot"
+                                >
+                                  <Sparkles className="w-3 h-3 text-sky-600" />
+                                  <span>Ask Copilot</span>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setSelectedAnomalyId(anom.id);
+                                  setActiveView('detail');
+                                }}
+                                className="text-xs text-[#004874] hover:text-[#002f4c] font-bold flex items-center gap-1"
+                              >
+                                <span>View Evidence</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

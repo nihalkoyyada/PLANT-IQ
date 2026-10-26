@@ -66,3 +66,32 @@ class PlantResponse(PlantBase):
         from_attributes=True,
         populate_by_name=True,
     )
+
+
+class PublicTelemetryTrendPoint(BaseModel):
+    timestamp: str
+    time: str
+    ac_power_mw: float
+    dc_power_mw: float
+
+
+class PublicPlantTelemetryResponse(BaseModel):
+    plant_id: str
+    plant_name: str
+    capacity_ac_mw: float
+    capacity_dc_mw: float
+    ac_power_mw: float
+    dc_power_mw: float
+    latest_timestamp: str | None = None
+    data_freshness: str  # "LIVE" | "STALE" | "OFFLINE"
+    status_label: str
+    stale_days: int | None = None
+    freshness_seconds: float | None = None
+    inverter_count: int
+    channel_count: int
+    last_active_ac_mw: float | None = None
+    last_active_dc_mw: float | None = None
+    last_active_timestamp: str | None = None
+    peak_ac_power_mw: float | None = None
+    trend: list[PublicTelemetryTrendPoint] = Field(default_factory=list)
+

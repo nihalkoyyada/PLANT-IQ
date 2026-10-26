@@ -33,6 +33,7 @@ from app.copilot.prompts import build_copilot_system_prompt
 from app.copilot.registry import CopilotToolRegistry, default_tool_registry
 from app.copilot.result_store import default_chart_store
 from app.llm.base import BaseProvider
+from app.llm.exceptions import ProviderError
 from app.llm.factory import get_llm_provider
 from app.llm.types import Message as LLMMessage, ProviderResponse, Usage
 from app.models.entities import ChartRecord, Conversation, Message, Plant, ToolCallRecord
@@ -252,7 +253,63 @@ class CopilotOrchestrator:
             prompt=prompt,
         )
 
-        # 3. Persist incoming user message
+        # 3. Check for duplicate submission / reconnect idempotency (Requirement 7)
+        if conversation_id:
+            recent_user_msg = session.execute(
+                select(Message)
+                .where(
+                    Message.conversation_id == conversation.id,
+                    Message.role == "user",
+                    Message.content == prompt,
+                )
+                .order_by(Message.created_at.desc())
+            ).scalars().first()
+
+            if recent_user_msg:
+                # Check if an assistant reply already exists following this user message
+                recent_reply = session.execute(
+                    select(Message)
+                    .where(
+                        Message.conversation_id == conversation.id,
+                        Message.role == "assistant",
+                        Message.created_at >= recent_user_msg.created_at,
+                    )
+                    .order_by(Message.created_at.asc())
+                ).scalars().first()
+
+                if recent_reply:
+                    # Return existing result without creating duplicate messages
+                    existing_trace: List[ToolTraceStep] = []
+                    for tc in recent_reply.tool_calls:
+                        existing_trace.append(
+                            ToolTraceStep(
+                                seq=tc.seq,
+                                tool_name=tc.tool_name,
+                                arguments=tc.input or {},
+                                raw_output=tc.output or {},
+                                status=tc.status,
+                                duration_ms=tc.duration_ms or 0,
+                                tool_call_id=tc.id,
+                            )
+                        )
+                    existing_charts = [ch.spec for ch in recent_reply.charts]
+                    existing_citations = extract_citations(recent_reply.content, existing_trace)
+
+                    return CopilotExecutionResult(
+                        conversation_id=conversation.id,
+                        message_id=recent_reply.id,
+                        user_message_id=recent_user_msg.id,
+                        content=recent_reply.content,
+                        tool_trace=existing_trace,
+                        citations=existing_citations,
+                        charts=existing_charts,
+                        usage=Usage(0, 0),
+                        model=recent_reply.model or self.provider.model,
+                        latency_ms=recent_reply.latency_ms or 0,
+                        tool_calls_count=len(existing_trace),
+                    )
+
+        # 4. Persist incoming user message
         user_msg = Message(
             conversation_id=conversation.id,
             role="user",
@@ -526,12 +583,30 @@ class CopilotOrchestrator:
             Event dictionaries: 'start', 'tool_start', 'tool_end', 'chart', 'delta', 'done'.
         """
         # Execute the agent reasoning and persistence
-        result = await self.execute(
-            prompt=prompt,
-            context=context,
-            session=session,
-            conversation_id=conversation_id,
-        )
+        try:
+            result = await self.execute(
+                prompt=prompt,
+                context=context,
+                session=session,
+                conversation_id=conversation_id,
+            )
+        except ProviderError as exc:
+            logger.warning("Copilot provider error during streaming: %s", exc)
+            yield {
+                "event": "error",
+                "error": exc.__class__.__name__,
+                "message": str(exc),
+                "provider": getattr(exc, "provider", "unknown"),
+            }
+            return
+        except Exception as exc:
+            logger.error("Unexpected error during Copilot execution: %s", exc, exc_info=True)
+            yield {
+                "event": "error",
+                "error": "execution_failed",
+                "message": str(exc),
+            }
+            return
 
         # Emit initial start event
         yield {

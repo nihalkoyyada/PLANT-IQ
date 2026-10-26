@@ -31,8 +31,15 @@ CANONICAL_KEY_ALIAS_MAP = {
     "total_yield": "energy_ac_total",
     "irradiance": "irradiance_poa",
     "irradiance_poa": "irradiance_poa",
+    "irradiation": "irradiance_poa",
+    "poa": "irradiance_poa",
+    "poa_irradiance": "irradiance_poa",
+    "irradiance_ghi": "irradiance_ghi",
+    "ghi": "irradiance_ghi",
     "module_temperature": "temperature_module",
+    "temperature_module": "temperature_module",
     "ambient_temperature": "temperature_ambient",
+    "temperature_ambient": "temperature_ambient",
     "temperature": "temperature_module",
     "wind_speed": "wind_speed",
     "wind_direction": "wind_direction",
@@ -157,13 +164,15 @@ def get_or_create_channel(
 
     if channel is None:
         unit = cs.unit if cs is not None else None
+        if target_key == "irradiance_poa" and source_name.upper() == "IRRADIATION":
+            unit = "kW/m²"
 
         channel = Channel(
             asset_id=asset_id,
             canonical_key=target_key,
             source_name=source_name,
             receive_unit=unit,
-            interval_s=300,
+            interval_s=900 if target_key == "irradiance_poa" else 300,
             agg_semantics="avg",
         )
         db.add(channel)
@@ -300,51 +309,103 @@ def process_ingestion_job(
 
         unique_source_keys = [str(sk) for sk in valid_df[source_key_column].unique() if pd.notna(sk)]
 
+        weather_signals = {
+            "irradiance_poa", "irradiance", "irradiance_ghi", "irradiation",
+            "temperature_ambient", "ambient_temperature", "temperature_module",
+            "module_temperature", "wind_speed", "wind_direction"
+        }
+        is_weather_dataset = any(
+            str(sig).lower() in weather_signals for sig in telemetry_mappings.values()
+        ) or any(sk == "HmiyD2TTLFNqkNe" for sk in unique_source_keys)
+
         if plants:
             target_plant = plants[0]
-            for sk in unique_source_keys:
-                if sk not in asset_by_source_key:
-                    name = f"Inverter {sk}"
-                    existing_by_name = db.execute(
-                        select(Asset).where(
-                            Asset.plant_id == target_plant.id,
-                            Asset.name == name,
-                        )
-                    ).scalars().first()
+            if is_weather_dataset:
+                # Find or create dedicated Weather Station WS-01 on target plant
+                ws_asset = db.execute(
+                    select(Asset).where(
+                        Asset.plant_id == target_plant.id,
+                        (Asset.asset_type == "weather_station") | (Asset.name == "WS-01")
+                    )
+                ).scalars().first()
 
-                    if existing_by_name:
-                        meta = dict(existing_by_name.metadata_ or {})
-                        meta["source_key"] = sk
-                        existing_by_name.metadata_ = meta
-                        asset_by_source_key[sk] = existing_by_name
+                misclassified_inv = db.execute(
+                    select(Asset).where(
+                        Asset.plant_id == target_plant.id,
+                        Asset.name.ilike("%Hmiy%"),
+                    )
+                ).scalars().first()
+
+                if ws_asset is None:
+                    if misclassified_inv is not None:
+                        misclassified_inv.name = "WS-01"
+                        misclassified_inv.asset_type = "weather_station"
+                        meta = dict(misclassified_inv.metadata_ or {})
+                        meta["sensor_type"] = "pyranometer_and_rtd"
+                        misclassified_inv.metadata_ = meta
+                        ws_asset = misclassified_inv
                     else:
-                        unassigned_asset = None
-                        for a in assets:
-                            a_sk = (a.metadata_ or {}).get("source_key")
-                            if not a_sk and a.id not in [mapped_a.id for mapped_a in asset_by_source_key.values()]:
-                                unassigned_asset = a
-                                break
+                        ws_asset = Asset(
+                            plant_id=target_plant.id,
+                            name="WS-01",
+                            asset_type="weather_station",
+                            metadata_={"source_key": "HmiyD2TTLFNqkNe", "source": "csv_ingestion", "sensor_type": "pyranometer_and_rtd"},
+                        )
+                        db.add(ws_asset)
+                        db.flush()
+                        assets.append(ws_asset)
+                elif misclassified_inv is not None and misclassified_inv.id != ws_asset.id:
+                    db.query(Channel).filter(Channel.asset_id == misclassified_inv.id).update({"asset_id": ws_asset.id})
+                    db.delete(misclassified_inv)
+                    db.flush()
 
-                        if unassigned_asset:
-                            meta = dict(unassigned_asset.metadata_ or {})
-                            meta["source_key"] = sk
-                            unassigned_asset.metadata_ = meta
-                            asset_by_source_key[sk] = unassigned_asset
-                        else:
-                            new_asset = Asset(
-                                plant_id=target_plant.id,
-                                name=name,
-                                asset_type="inverter",
-                                metadata_={"source_key": sk, "source": "csv_ingestion"},
+                for sk in unique_source_keys:
+                    asset_by_source_key[sk] = ws_asset
+            else:
+                for sk in unique_source_keys:
+                    if sk not in asset_by_source_key:
+                        name = f"Inverter {sk}"
+                        existing_by_name = db.execute(
+                            select(Asset).where(
+                                Asset.plant_id == target_plant.id,
+                                Asset.name == name,
                             )
-                            db.add(new_asset)
-                            db.flush()
-                            assets.append(new_asset)
-                            asset_by_source_key[sk] = new_asset
+                        ).scalars().first()
 
-        # Pre-create / cache channels for all mapped columns across assets
+                        if existing_by_name:
+                            meta = dict(existing_by_name.metadata_ or {})
+                            meta["source_key"] = sk
+                            existing_by_name.metadata_ = meta
+                            asset_by_source_key[sk] = existing_by_name
+                        else:
+                            unassigned_asset = None
+                            for a in assets:
+                                a_sk = (a.metadata_ or {}).get("source_key")
+                                if not a_sk and a.id not in [mapped_a.id for mapped_a in asset_by_source_key.values()]:
+                                    unassigned_asset = a
+                                    break
+
+                            if unassigned_asset:
+                                meta = dict(unassigned_asset.metadata_ or {})
+                                meta["source_key"] = sk
+                                unassigned_asset.metadata_ = meta
+                                asset_by_source_key[sk] = unassigned_asset
+                            else:
+                                new_asset = Asset(
+                                    plant_id=target_plant.id,
+                                    name=name,
+                                    asset_type="inverter",
+                                    metadata_={"source_key": sk, "source": "csv_ingestion"},
+                                )
+                                db.add(new_asset)
+                                db.flush()
+                                assets.append(new_asset)
+                                asset_by_source_key[sk] = new_asset
+
+        # Pre-create / cache channels for all mapped columns across the actual assets in this file
+        target_assets = {asset_by_source_key[sk] for sk in unique_source_keys if sk in asset_by_source_key}
         channel_cache: Dict[Tuple[UUID, str], Channel] = {}
-        for asset in asset_by_source_key.values():
+        for asset in target_assets:
             for col, sig_key in telemetry_mappings.items():
                 cache_k = (asset.id, col)
                 if cache_k not in channel_cache:

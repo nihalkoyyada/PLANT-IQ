@@ -7,11 +7,12 @@ import {
   UploadCloud,
   CheckCircle2,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getQCStats } from '../../api/readings';
 
-export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'anomalies' | 'ingestion' | 'quality';
+export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'anomalies' | 'copilot' | 'ingestion' | 'quality';
 
 interface SidebarProps {
   activeTab: NavTab;

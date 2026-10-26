@@ -69,42 +69,71 @@ def s4_setup():
             db.commit()
             db.refresh(asset1)
 
-        # Seed two anomalies for plant 1
-        anom1 = Anomaly(
-            plant_id=plant1.id,
-            asset_id=asset1.id,
-            start_time=datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 7, 10, 13, 0, tzinfo=timezone.utc),
-            source="detector",
-            score=0.95,
-            severity="critical",
-            status="open",
-            estimated_loss_kw=450.0,
-            summary="Midday inverter trip detected on Inverter-Alpha-01",
-            details={
-                "total_energy_loss_kwh": 900.0,
-                "total_financial_loss_inr": 3375.0,
-                "anomaly_type": "trip",
-            },
+        # Seed two anomalies for plant 1 (idempotent lookup to avoid test duplicate accumulation)
+        anom1 = (
+            db.query(Anomaly)
+            .filter(
+                Anomaly.plant_id == plant1.id,
+                Anomaly.asset_id == asset1.id,
+                Anomaly.start_time == datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc),
+            )
+            .first()
         )
-        anom2 = Anomaly(
-            plant_id=plant1.id,
-            asset_id=asset1.id,
-            start_time=datetime(2026, 7, 11, 9, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 7, 11, 10, 0, tzinfo=timezone.utc),
-            source="detector",
-            score=0.72,
-            severity="high",
-            status="open",
-            estimated_loss_kw=180.0,
-            summary="PR deviation detected on Inverter-Alpha-01",
-            details={
-                "total_energy_loss_kwh": 180.0,
-                "total_financial_loss_inr": 675.0,
-                "anomaly_type": "deviation",
-            },
+        if not anom1:
+            anom1 = Anomaly(
+                plant_id=plant1.id,
+                asset_id=asset1.id,
+                start_time=datetime(2026, 7, 10, 11, 0, tzinfo=timezone.utc),
+                end_time=datetime(2026, 7, 10, 13, 0, tzinfo=timezone.utc),
+                source="detector",
+                score=0.95,
+                severity="critical",
+                status="open",
+                estimated_loss_kw=450.0,
+                summary="Midday inverter trip detected on Inverter-Alpha-01",
+                details={
+                    "total_energy_loss_kwh": 900.0,
+                    "total_financial_loss_inr": 3375.0,
+                    "anomaly_type": "trip",
+                },
+            )
+            db.add(anom1)
+        else:
+            anom1.status = "open"
+            anom1.status_note = None
+
+        anom2 = (
+            db.query(Anomaly)
+            .filter(
+                Anomaly.plant_id == plant1.id,
+                Anomaly.asset_id == asset1.id,
+                Anomaly.start_time == datetime(2026, 7, 11, 9, 0, tzinfo=timezone.utc),
+            )
+            .first()
         )
-        db.add_all([anom1, anom2])
+        if not anom2:
+            anom2 = Anomaly(
+                plant_id=plant1.id,
+                asset_id=asset1.id,
+                start_time=datetime(2026, 7, 11, 9, 0, tzinfo=timezone.utc),
+                end_time=datetime(2026, 7, 11, 10, 0, tzinfo=timezone.utc),
+                source="detector",
+                score=0.72,
+                severity="high",
+                status="open",
+                estimated_loss_kw=180.0,
+                summary="PR deviation detected on Inverter-Alpha-01",
+                details={
+                    "total_energy_loss_kwh": 180.0,
+                    "total_financial_loss_inr": 675.0,
+                    "anomaly_type": "deviation",
+                },
+            )
+            db.add(anom2)
+        else:
+            anom2.status = "open"
+            anom2.status_note = None
+
         db.commit()
         db.refresh(anom1)
         db.refresh(anom2)

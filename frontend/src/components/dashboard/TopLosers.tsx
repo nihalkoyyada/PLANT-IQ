@@ -1,13 +1,14 @@
 import React from 'react';
 import { LossAnalysisResponse } from '../../types';
-import { AlertTriangle, ArrowDownRight, Zap, Info, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ArrowDownRight, Zap, Info, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface TopLosersProps {
   data: LossAnalysisResponse | null;
   loading: boolean;
+  onAskCopilot?: (prompt: string) => void;
 }
 
-export const TopLosers: React.FC<TopLosersProps> = ({ data, loading }) => {
+export const TopLosers: React.FC<TopLosersProps> = ({ data, loading, onAskCopilot }) => {
   if (loading) {
     return (
       <div className="bg-white rounded-xl p-5 border border-slate-200/90 shadow-xs animate-pulse space-y-4">
@@ -81,17 +82,37 @@ export const TopLosers: React.FC<TopLosersProps> = ({ data, loading }) => {
             {headerTitle}
           </h3>
         </div>
-        <span
-          className={`text-xs font-mono border px-2.5 py-1 rounded-md self-start sm:self-auto ${
-            hasPoa && !hasDeficits
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : hasPoa && hasDeficits
-              ? 'bg-rose-50 text-rose-700 border-rose-200'
-              : 'bg-slate-100 text-slate-600 border-slate-200/80'
-          }`}
-        >
-          {rankingBadgeText}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className={`text-xs font-mono border px-2.5 py-1 rounded-md self-start sm:self-auto ${
+              hasPoa && !hasDeficits
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : hasPoa && hasDeficits
+                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                : 'bg-slate-100 text-slate-600 border-slate-200/80'
+            }`}
+          >
+            {rankingBadgeText}
+          </span>
+          {onAskCopilot && (
+            <button
+              onClick={() =>
+                onAskCopilot(
+                  `Analyze inverter energy deficits and loss causes for Surya Solar Farm (${data.range.toUpperCase()} window). Net shortfall: ${netShortfallMWh.toFixed(
+                    2
+                  )} MWh, aggregate underperforming inverter deficit: ${aggregateDeficitMWh.toFixed(
+                    2
+                  )} MWh.`
+                )
+              }
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-50 hover:bg-sky-100 text-[#004874] border border-sky-200 text-xs font-semibold transition"
+              title="Analyze Inverter Shortfalls with Copilot"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+              <span>Ask Copilot</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Provisional PR & Capacity Notice */}

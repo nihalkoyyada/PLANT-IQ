@@ -77,6 +77,7 @@ def get_anomalies(
     status: Optional[str] = Query(None, description="Filter by status ('open', 'acknowledged', 'resolved', 'false_positive')"),
     start_time_gte: Optional[datetime] = Query(None, description="Filter by start time >= value"),
     end_time_lte: Optional[datetime] = Query(None, description="Filter by end time <= value"),
+    include_superseded: bool = Query(default=False, description="Include superseded duplicate records"),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -96,29 +97,47 @@ def get_anomalies(
         enforce_org_access(current_user, plant.org_id)
         query = query.where(Anomaly.plant_id == plant_id)
 
-    if asset_id is not None:
+    if asset_id is not None and not hasattr(asset_id, "default"):
         query = query.where(Anomaly.asset_id == asset_id)
 
-    if detector_id is not None:
+    if detector_id is not None and not hasattr(detector_id, "default"):
         query = query.where(Anomaly.detector_id == detector_id)
 
-    if severity is not None:
+    if severity is not None and isinstance(severity, str):
         query = query.where(Anomaly.severity == severity.lower())
 
-    if status is not None:
+    if status is not None and isinstance(status, str):
         query = query.where(Anomaly.status == status.lower())
 
-    if start_time_gte is not None:
+    if start_time_gte is not None and isinstance(start_time_gte, datetime):
         query = query.where(Anomaly.start_time >= start_time_gte)
 
-    if end_time_lte is not None:
+    if end_time_lte is not None and isinstance(end_time_lte, datetime):
         query = query.where(Anomaly.start_time <= end_time_lte)
 
-    query = query.order_by(Anomaly.start_time.desc()).offset(offset).limit(limit)
+    limit_val = limit if isinstance(limit, int) else 100
+    offset_val = offset if isinstance(offset, int) else 0
+    inc_sup = include_superseded if isinstance(include_superseded, bool) else False
+
+    query = query.order_by(Anomaly.start_time.desc(), Anomaly.created_at.desc()).offset(offset_val).limit(limit_val)
     anomalies = db.execute(query).scalars().all()
+
+    # Filter out superseded duplicates unless explicitly requested
+    if not inc_sup:
+        anomalies = [a for a in anomalies if not (a.details or {}).get("is_superseded")]
+
+    # Guarantee that no logical event appears twice in a single view
+    seen_events = set()
+    unique_anomalies = []
     for a in anomalies:
+        fingerprint = (a.details or {}).get("event_fingerprint") or f"{a.plant_id}:{a.asset_id}:{a.start_time}:{(a.details or {}).get('detector_method', a.source)}"
+        if fingerprint not in seen_events:
+            seen_events.add(fingerprint)
+            unique_anomalies.append(a)
+
+    for a in unique_anomalies:
         _enrich_anomaly(a, db)
-    return anomalies
+    return unique_anomalies
 
 
 @router.get(
@@ -144,12 +163,24 @@ def get_anomalies_summary(
         enforce_org_access(current_user, plant.org_id)
         query = query.where(Anomaly.plant_id == plant_id)
 
+    query = query.order_by(Anomaly.start_time.desc(), Anomaly.created_at.desc())
     anomalies = db.execute(query).scalars().all()
+    # Exclude superseded duplicate records from active metrics
+    canonical_anomalies_raw = [a for a in anomalies if not (a.details or {}).get("is_superseded")]
+
+    # Deduplicate by logical event fingerprint so summary metrics match canonical stream
+    seen_events = set()
+    canonical_anomalies = []
+    for a in canonical_anomalies_raw:
+        fingerprint = (a.details or {}).get("event_fingerprint") or f"{a.plant_id}:{a.asset_id}:{a.start_time}:{(a.details or {}).get('detector_method', a.source)}"
+        if fingerprint not in seen_events:
+            seen_events.add(fingerprint)
+            canonical_anomalies.append(a)
 
     total_loss_kwh = 0.0
     total_loss_inr = 0.0
 
-    for a in anomalies:
+    for a in canonical_anomalies:
         details = a.details or {}
         is_stale_inflated = (
             (a.estimated_loss_kw and a.estimated_loss_kw > 1500.0)
@@ -166,12 +197,12 @@ def get_anomalies_summary(
         total_loss_kwh += float(kwh)
         total_loss_inr += float(inr)
 
-    total = len(anomalies)
-    open_count = sum(1 for a in anomalies if a.status == "open")
-    critical_count = sum(1 for a in anomalies if a.severity == "critical" and a.status == "open")
-    high_count = sum(1 for a in anomalies if a.severity == "high" and a.status == "open")
-    medium_count = sum(1 for a in anomalies if a.severity == "medium" and a.status == "open")
-    low_count = sum(1 for a in anomalies if a.severity == "low" and a.status == "open")
+    total = len(canonical_anomalies)
+    open_count = sum(1 for a in canonical_anomalies if a.status == "open")
+    critical_count = sum(1 for a in canonical_anomalies if a.severity == "critical" and a.status == "open")
+    high_count = sum(1 for a in canonical_anomalies if a.severity == "high" and a.status == "open")
+    medium_count = sum(1 for a in canonical_anomalies if a.severity == "medium" and a.status == "open")
+    low_count = sum(1 for a in canonical_anomalies if a.severity == "low" and a.status == "open")
 
     return AnomalySummary(
         total_anomalies=total,
@@ -619,6 +650,10 @@ def get_anomaly_evidence(
 def trigger_plant_anomaly_scan(
     plant_id: UUID,
     window_hours: int = Query(default=24, ge=1, le=168),
+    is_backfill: Optional[bool] = Query(default=None, description="Explicit historical backfill/replay mode (or None for adaptive scan)"),
+    dry_run: bool = Query(default=False, description="Preview candidates without committing database changes"),
+    start_time: Optional[datetime] = Query(default=None, description="Explicit scan start time"),
+    end_time: Optional[datetime] = Query(default=None, description="Explicit scan end time"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "engineer")),
 ):
@@ -633,5 +668,9 @@ def trigger_plant_anomaly_scan(
         db=db,
         plant_id=plant_id,
         window_hours=window_hours,
+        start_time=start_time,
+        end_time=end_time,
+        is_backfill=is_backfill,
+        dry_run=dry_run,
     )
     return result

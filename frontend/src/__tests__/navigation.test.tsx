@@ -5,6 +5,7 @@ import { AnomalyBanner } from '../components/dashboard/AnomalyBanner';
 import { Sidebar, NavTab } from '../components/layout/Sidebar';
 import { MobileNav } from '../components/layout/MobileNav';
 import { DashboardPage } from '../pages/DashboardPage';
+import { Header } from '../components/layout/Header';
 
 // Polyfill ResizeObserver for jsdom
 (globalThis as any).ResizeObserver = class ResizeObserver {
@@ -12,6 +13,14 @@ import { DashboardPage } from '../pages/DashboardPage';
   unobserve() {}
   disconnect() {}
 };
+
+// Polyfill URL.createObjectURL and URL.revokeObjectURL for jsdom
+if (!window.URL.createObjectURL) {
+  window.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/mock-blob-url');
+}
+if (!window.URL.revokeObjectURL) {
+  window.URL.revokeObjectURL = vi.fn();
+}
 
 // Mock auth context for Sidebar
 vi.mock('../context/AuthContext', () => ({
@@ -210,5 +219,112 @@ describe('Sprint 4 Dashboard Triage Navigation', () => {
     expect(rows[1].textContent).toContain('Inverter Critical Active Asset');
     expect(rows[1].textContent).toContain('critical');
     expect(rows[1].textContent).toContain('Open');
+  });
+
+  it('verifies Solar Copilot page is removed from Sidebar and MobileNav so Copilot is exclusively the floating widget', () => {
+    const handleSelectTab = vi.fn();
+    render(<Sidebar activeTab="dashboard" onSelectTab={handleSelectTab} />);
+
+    // Solar Copilot should NOT be in the sidebar navigation items
+    expect(screen.queryByRole('button', { name: /Solar Copilot/i })).toBeNull();
+
+    // Solar Copilot should NOT be in MobileNav
+    const { unmount } = render(<MobileNav activeTab="dashboard" onSelectTab={handleSelectTab} />);
+    expect(screen.queryByRole('button', { name: /^Copilot$/i })).toBeNull();
+    unmount();
+  });
+
+  it('renders interactive Header Search bar and navigates to matching asset or page on selection', async () => {
+    const handleNavigateTab = vi.fn();
+    const mockPlants = [{ id: 'plant-1', name: 'Surya Solar Farm', capacity_ac_kw: 50000 }] as unknown as any[];
+
+    render(
+      <Header
+        plants={mockPlants}
+        selectedPlant={mockPlants[0]}
+        onSelectPlant={vi.fn()}
+        onNavigateTab={handleNavigateTab}
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Search assets, telemetry.../i) as HTMLInputElement;
+    expect(searchInput).toBeDefined();
+
+    // Focusing without typing opens Quick Navigation shortcuts
+    fireEvent.focus(searchInput);
+    await waitFor(() => {
+      expect(screen.getByText(/Quick Navigation/i)).toBeDefined();
+    });
+
+    // Type query to filter
+    fireEvent.change(searchInput, { target: { value: 'Inverter' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Matching Results/i)).toBeDefined();
+    });
+
+    // Select filtered asset result
+    const assetResult = screen.getByText('Inverter 01');
+    expect(assetResult).toBeDefined();
+
+    fireEvent.click(assetResult);
+
+    // Navigates to devices tab
+    expect(handleNavigateTab).toHaveBeenCalledWith('devices');
+    expect(searchInput.value).toBe('');
+  });
+
+  it('renders interactive Header Notifications popover with badge, mark all read, and click navigation', async () => {
+    const handleNavigateTab = vi.fn();
+    const mockPlants = [{ id: 'plant-1', name: 'Surya Solar Farm', capacity_ac_kw: 50000 }] as unknown as any[];
+
+    render(
+      <Header
+        plants={mockPlants}
+        selectedPlant={mockPlants[0]}
+        onSelectPlant={vi.fn()}
+        onNavigateTab={handleNavigateTab}
+      />
+    );
+
+    const notifBell = screen.getByRole('button', { name: /Operational Notifications/i });
+    expect(notifBell).toBeDefined();
+
+    // Click to open notifications popover
+    fireEvent.click(notifBell);
+
+    await waitFor(() => {
+      expect(screen.getByText('Notifications')).toBeDefined();
+      expect(screen.getByText(/Active critical trip|Inverter Trip Outlier/i)).toBeDefined();
+    });
+
+    // Click a notification to navigate to Anomaly Inbox
+    const notifItem = screen.getByText(/Active critical trip|Inverter Trip Outlier/i);
+    fireEvent.click(notifItem);
+
+    expect(handleNavigateTab).toHaveBeenCalledWith('anomalies');
+  });
+
+  it('supports exporting SCADA report CSV on Dashboard download button and verifies Ask Copilot is removed', async () => {
+    render(<DashboardPage onNavigateTab={vi.fn()} />);
+
+    // Wait for Dashboard to finish loading
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Export SCADA Report/i })).toBeDefined();
+    });
+
+    const exportBtn = screen.getByRole('button', { name: /Export SCADA Report/i });
+    expect(exportBtn).toBeDefined();
+
+    // Ask Copilot button should NOT exist in the dashboard toolbar
+    expect(screen.queryByRole('button', { name: /Ask Copilot/i })).toBeNull();
+
+    // Click download button
+    fireEvent.click(exportBtn);
+
+    // Verify visual feedback on export
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Export SCADA Report/i).getAttribute('title')).toBe('SCADA Report Downloaded!');
+    });
   });
 });

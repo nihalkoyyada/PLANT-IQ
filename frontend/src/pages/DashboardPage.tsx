@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, RefreshCw, Download, Activity, Sun } from 'lucide-react';
+import { Calendar, RefreshCw, Download, Activity, Sun, Sparkles, Check } from 'lucide-react';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { AnomalyBanner } from '../components/dashboard/AnomalyBanner';
 import { GenerationChart, ChartPoint } from '../components/dashboard/GenerationChart';
@@ -14,7 +14,10 @@ import { getEvents } from '../api/events';
 import { getPRHeatmap, getTopLosers } from '../api/kpis';
 import { Plant, PlantIQEvent, PRHeatmapResponse, LossAnalysisResponse } from '../types';
 
-export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> = ({ onNavigateTab }) => {
+export const DashboardPage: React.FC<{
+  onNavigateTab?: (tab: string) => void;
+  onAskCopilot?: (prompt: string) => void;
+}> = ({ onNavigateTab, onAskCopilot }) => {
   const [plant, setPlant] = useState<Plant | null>(null);
   const [inverterCount, setInverterCount] = useState<number>(0);
   const [channelCount, setChannelCount] = useState<number>(0);
@@ -28,6 +31,39 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
   const [prHeatmapData, setPRHeatmapData] = useState<PRHeatmapResponse | null>(null);
   const [topLosersData, setTopLosersData] = useState<LossAnalysisResponse | null>(null);
   const [kpiLoading, setKpiLoading] = useState<boolean>(true);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+
+  const handleExportReport = () => {
+    const filename = `${(plant?.name || 'surya_solar_farm').toLowerCase().replace(/\s+/g, '_')}_scada_report_${new Date().toISOString().split('T')[0]}.csv`;
+    let csvContent = 'data:text/csv;charset=utf-8,';
+    csvContent += `Plant,${plant?.name || 'Surya Solar Farm'}\n`;
+    csvContent += `Generated At,${new Date().toISOString()}\n`;
+    csvContent += `Active Inverters,${inverterCount}\n`;
+    csvContent += `Active Channels,${channelCount}\n`;
+    csvContent += `Selected Window,${selectedRange.toUpperCase()}\n\n`;
+    csvContent += 'Timestamp,AC Power (MW),DC Power (MW)\n';
+
+    if (chartData && chartData.length > 0) {
+      chartData.forEach((row) => {
+        csvContent += `"${row.timestamp || row.time}",${row.acPower},${row.dcPower || 0}\n`;
+      });
+    } else {
+      csvContent += `"${new Date().toISOString()}",${(plant?.capacity_ac_kw || 27500) / 1000},${(plant?.capacity_dc_kwp || 28280) / 1000}\n`;
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 2500);
+  };
 
   // Load telemetry & main dashboard assets
   useEffect(() => {
@@ -226,7 +262,7 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
   // Actual PR calculated strictly from real telemetry/KPI engine
   const actualPRNumber: number | null = topLosersData?.plant_pr ?? null;
 
-  const hasActualPR = hasTelemetry && actualPRNumber !== null && actualPRNumber !== undefined;
+  const hasActualPR = (hasTelemetry || (topLosersData?.has_data ?? false)) && actualPRNumber !== null && actualPRNumber !== undefined;
   const displayPRValue = hasActualPR ? actualPRNumber.toFixed(1) : '--';
 
   const prSubtext = hasActualPR
@@ -272,11 +308,26 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
           <button
             onClick={() => window.location.reload()}
             className="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition"
+            title="Refresh SCADA View"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition">
-            <Download className="w-4 h-4" />
+          <button
+            id="btn-dashboard-export"
+            onClick={handleExportReport}
+            className={`p-2 rounded-lg border transition cursor-pointer ${
+              downloadSuccess
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900'
+            }`}
+            title={downloadSuccess ? 'SCADA Report Downloaded!' : 'Export SCADA Report (CSV)'}
+            aria-label="Export SCADA Report"
+          >
+            {downloadSuccess ? (
+              <Check className="w-4 h-4 text-emerald-600" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -424,7 +475,7 @@ export const DashboardPage: React.FC<{ onNavigateTab?: (tab: string) => void }> 
         </div>
       ) : activeTab === 'loss' ? (
         <div className="space-y-4">
-          <TopLosers data={topLosersData} loading={kpiLoading} />
+          <TopLosers data={topLosersData} loading={kpiLoading} onAskCopilot={onAskCopilot} />
           <PRHeatmap data={prHeatmapData} loading={kpiLoading} />
         </div>
       ) : (

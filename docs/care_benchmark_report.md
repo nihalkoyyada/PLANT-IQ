@@ -1,7 +1,7 @@
 # PlantIQ: CARE Benchmark & Detector Validation Report (§12, Task S4-AI-05)
 
-**Benchmark Run ID:** `CARE-D8241176`  
-**Date:** 2026-10-14 11:22:24 UTC  
+**Benchmark Run ID:** `CARE-72933521`  
+**Date:** 2026-10-15 15:44:19 UTC  
 **Target System:** Surya-A Solar Park (Plant 1, 28.28 MWp DC / 27.50 MW AC)  
 **Evaluated Algorithms:** D1 (Statistical Outlier), D2 (PR Deviation), D3 (Irradiance Residual), D4 (Isolation Forest), Rule Baselines & Ensemble  
 **Status:** **BENCHMARK COMPLETE (VERIFIED)**  
@@ -13,10 +13,10 @@
 This report documents the empirical validation of the PlantIQ Anomaly Detection Framework (Tasks `S4-AI-01` through `S4-AI-04`) evaluated via the **CARE (Comprehensive Anomaly Recognition & Evaluation)** benchmark harness against `Surya-A-demo.csv` (68,778 rows across 22 inverters) containing 4 verified real-world operational fault injections.
 
 ### Key Performance Highlights:
-- **Multi-Model CARE Ensemble Recall:** **75.0%** (3 of 4 critical field events successfully caught).
-- **Ensemble Event Precision:** **50.0%** with an Event F1 Score of **0.600**.
-- **Average Lead-Time Before Peak Loss:** **43.8 hours** (2625 minutes).
-- **Top Single Detector:** **Inverter Trip Detector** achieved an Event Recall of **100.0%** and F1 Score of **0.400**.
+- **Multi-Model CARE Ensemble Recall:** **100.0%** (4 of 4 critical field events successfully caught).
+- **Ensemble Event Precision:** **1.2%** with an Event F1 Score of **0.023**.
+- **Average Lead-Time Before Peak Loss:** **70.1 hours** (4208 minutes).
+- **Top Single Detector:** **Sensor Flatline Detector** achieved an Event Recall of **100.0%** and F1 Score of **0.286**.
 - **D4 Isolation Forest Early Warning:** Flagged initial behavioral instability and gradient step changes up to **15 minutes in advance** of complete inverter shutdown.
 
 ---
@@ -49,9 +49,9 @@ Classification metrics evaluate event-level incident capture and sample-level di
 
 | Detector / Model | Event Precision | Event Recall | Event F1 | Interval F1 | False Alarm Rate (FAR) | Mean Lead Time | Throughput |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Inverter Trip Detector** | 25.0% | 100.0% | **0.400** | 0.026 | 0.09% | 3.8 hrs | 6,178,004 rows/s |
-| **Sensor Flatline Detector** | 16.7% | 100.0% | **0.286** | 0.131 | 0.00% | 1.8 hrs | 3,044,357 rows/s |
-| **CARE Multi-Model Ensemble** | 50.0% | 75.0% | **0.600** | 0.151 | 0.09% | 43.8 hrs | 2,104,399 rows/s |
+| **Inverter Trip Detector** | 0.3% | 100.0% | **0.006** | 0.040 | 1.54% | 3.8 hrs | 475,086 rows/s |
+| **Sensor Flatline Detector** | 16.7% | 100.0% | **0.286** | 0.131 | 0.00% | 1.8 hrs | 1,222,641 rows/s |
+| **CARE Multi-Model Ensemble** | 1.2% | 100.0% | **0.023** | 0.138 | 1.54% | 70.1 hrs | 299,155 rows/s |
 
 ---
 
@@ -61,7 +61,7 @@ Lead-time evaluates how far in advance of maximum asset failure or critical perf
 
 | Ground Truth Event | Fault Category | Target Device | First Alert Detector | Detection Latency / Lead Time | Diagnostic Operational Benefit |
 | :--- | :--- | :--- | :--- | :---: | :--- |
-| `soil-001` | `SOILING` | `1BY6WEcLGh8j5v7` | **-** | **Missed** | Requires lower threshold sensitivity |
+| `soil-001` | `SOILING` | `1BY6WEcLGh8j5v7` | **CARE Multi-Model Ensemble** | **149.2 hrs lead** | Progressive detection (+42.5 hrs into degradation) |
 | `trip-001` | `TRIP` | `1IF53ai7Xc0U56Y` | **Inverter Trip Detector** | **3.8 hrs lead** | Immediate trigger at onset (0 min latency) |
 | `clip-001` | `CLIPPING` | `3PZuoBAID5Wc2HD` | **CARE Multi-Model Ensemble** | **125.8 hrs lead** | Immediate trigger at onset (0 min latency) |
 | `flat-001` | `FLATLINE` | `7JYdWkrLSPkdwr4` | **Sensor Flatline Detector** | **1.8 hrs lead** | Immediate trigger at onset (0 min latency) |
@@ -108,9 +108,9 @@ By pairing detection with PlantIQ's `FinancialLossPolicy` (configured at ₹3.50
 
 | Detector / Ensemble | Alarms Flagged | Energy Deficit Quantified (kWh) | Revenue at Risk Flagged (₹) | Deduplication Merges |
 | :--- | :---: | :---: | :---: | :---: |
-| **Inverter Trip Detector** | 5 | 7,600.0 kWh | ₹31,920.00 | Enabled (Rolling Merges) |
+| **Inverter Trip Detector** | 357 | 79,600.0 kWh | ₹334,320.00 | Enabled (Rolling Merges) |
 | **Sensor Flatline Detector** | 8 | 0.0 kWh | ₹0.00 | Enabled (Rolling Merges) |
-| **CARE Multi-Model Ensemble** | 13 | 7,600.0 kWh | ₹31,920.00 | Enabled (Rolling Merges) |
+| **CARE Multi-Model Ensemble** | 365 | 79,600.0 kWh | ₹334,320.00 | Enabled (Rolling Merges) |
 
 ---
 

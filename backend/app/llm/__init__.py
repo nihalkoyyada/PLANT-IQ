@@ -1,4 +1,4 @@
-﻿"""PlantIQ LLM Provider Abstraction Package."""
+"""PlantIQ LLM Provider Abstraction Package."""
 
 from app.llm.anthropic import AnthropicProvider
 from app.llm.base import BaseProvider
@@ -11,7 +11,7 @@ from app.llm.exceptions import (
     ProviderTimeout,
 )
 from app.llm.factory import get_llm_provider
-from app.llm.hooks import InMemoryUsageRecorder, UsageRecord, UsageRecorder
+from app.llm.mock import DEFAULT_MOCK_MODEL, MockLLMProvider
 from app.llm.openai_compatible import OpenAICompatibleProvider
 from app.llm.types import (
     Message,
@@ -29,6 +29,8 @@ __all__ = [
     "BaseProvider",
     "AnthropicProvider",
     "OpenAICompatibleProvider",
+    "MockLLMProvider",
+    "DEFAULT_MOCK_MODEL",
     "get_llm_provider",
     "ProviderError",
     "ProviderTimeout",

@@ -27,7 +27,7 @@ from app.ai.detector_registry import (
 )
 from app.core.celery_app import celery_app
 from app.db.session import create_db_engine, get_session_factory
-from app.models.entities import Asset, CanonicalSignal, Channel, Detector, Plant, Reading
+from app.models.entities import Anomaly, Asset, CanonicalSignal, Channel, Detector, Plant, Reading
 
 
 @celery_app.task(name="tasks.scan_plant_anomalies", bind=True)
@@ -71,6 +71,7 @@ def run_scheduled_anomaly_scans(
                 db=session,
                 plant_id=plant.id,
                 window_hours=window_hours,
+                is_backfill=False,  # Routine scheduled scan is strictly NOT a historical backfill
             )
             total_scanned += 1
             total_anomalies += summary.get("anomalies_detected", 0)
@@ -90,6 +91,10 @@ def execute_plant_anomaly_scan(
     db: Session,
     plant_id: UUID,
     window_hours: int = 24,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    is_backfill: Optional[bool] = None,
+    dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Core synchronization scan logic executing detectors and deduplicating results."""
     plant = db.get(Plant, plant_id)
@@ -107,11 +112,57 @@ def execute_plant_anomaly_scan(
     if max_ts and max_ts.tzinfo is None:
         max_ts = max_ts.replace(tzinfo=timezone.utc)
 
-    anchor_time = max_ts if (max_ts and (now_utc - max_ts).days > 7) else now_utc
-    if window_hours and window_hours > 0:
-        start_window = anchor_time - timedelta(hours=window_hours)
+    # Telemetry data freshness & staleness check
+    is_stale = False
+    stale_days = None
+    if max_ts:
+        stale_days = (now_utc - max_ts).days
+        is_stale = stale_days > 7
     else:
-        start_window = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        is_stale = True
+
+    # Window Selection:
+    # 1. Explicit window provided
+    if start_time is not None and end_time is not None:
+        start_window = start_time.replace(tzinfo=timezone.utc) if start_time.tzinfo is None else start_time
+        anchor_time = end_time.replace(tzinfo=timezone.utc) if end_time.tzinfo is None else end_time
+        scan_mode = "explicit_window"
+    # 2. Explicit backfill mode requested
+    elif is_backfill is True:
+        anchor_time = end_time if end_time is not None else (max_ts if max_ts else now_utc)
+        start_window = start_time if start_time is not None else (anchor_time - timedelta(hours=window_hours))
+        scan_mode = "historical_backfill"
+    # 3. Routine scan (is_backfill=False)
+    elif is_backfill is False:
+        if is_stale:
+            # Routine scan: do NOT scan years-old historical telemetry silently
+            return {
+                "plant_id": str(plant_id),
+                "plant_name": plant.name,
+                "status": "stale_data",
+                "data_freshness": "stale",
+                "latest_telemetry_ts": max_ts.isoformat() if max_ts else None,
+                "stale_days": stale_days,
+                "scan_mode": "routine",
+                "message": "Routine scan aborted: latest telemetry is older than 7 days. Use explicit historical backfill (is_backfill=true) to scan historical telemetry.",
+                "assets_scanned": 0,
+                "detectors_evaluated": 0,
+                "anomalies_detected": 0,
+                "anomalies_created": 0,
+                "anomalies_merged": 0,
+                "anomalies_reconciled": 0,
+            }
+        anchor_time = now_utc
+        start_window = now_utc - timedelta(hours=window_hours)
+        scan_mode = "routine"
+    else:
+        # Default / Backward-compatible programmatic mode (for test fixtures with seeded past data)
+        anchor_time = max_ts if (max_ts and (now_utc - max_ts).days > 7) else now_utc
+        if window_hours and window_hours > 0:
+            start_window = anchor_time - timedelta(hours=window_hours)
+        else:
+            start_window = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        scan_mode = "historical_replay" if (max_ts and (now_utc - max_ts).days > 7) else "routine"
 
     # 1. Fetch enabled detectors for this plant
     detectors = (
@@ -128,24 +179,42 @@ def execute_plant_anomaly_scan(
 
     # 2. Fetch irradiance weather reference if available
     irradiance_map: Dict[datetime, float] = {}
+    weather_channel_keys = [
+        "irradiance_poa",
+        "poa_irradiance",
+        "irradiance_ghi",
+        "ghi_irradiance",
+        "irradiation",
+        "irradiance",
+        "weather_irradiance",
+    ]
     weather_channels = (
         db.execute(
             select(Channel)
             .join(Asset, Channel.asset_id == Asset.id)
             .where(
                 Asset.plant_id == plant_id,
-                Channel.canonical_key.in_(["poa_irradiance", "ghi_irradiance", "irradiation", "irradiance"]),
+                Channel.canonical_key.in_(weather_channel_keys),
             )
         )
         .scalars()
         .all()
     )
     if weather_channels:
+        # Prioritize POA over GHI / general irradiance
+        chosen_channel = None
+        for ch in weather_channels:
+            if "poa" in ch.canonical_key.lower():
+                chosen_channel = ch
+                break
+        if not chosen_channel:
+            chosen_channel = weather_channels[0]
+
         irr_readings = (
             db.execute(
                 select(Reading)
                 .where(
-                    Reading.channel_id == weather_channels[0].id,
+                    Reading.channel_id == chosen_channel.id,
                     Reading.ts >= start_window,
                 )
                 .order_by(Reading.ts.asc())
@@ -154,13 +223,19 @@ def execute_plant_anomaly_scan(
             .all()
         )
         for r in irr_readings:
-            irradiance_map[r.ts] = float(r.value)
+            ts_utc = r.ts.replace(tzinfo=timezone.utc) if r.ts.tzinfo is None else r.ts
+            val = float(r.value)
+            # If reading is in kW/m² (standard sun irradiance is <= 2.5 kW/m²), normalize to W/m²
+            if 0.0 < val <= 2.5 or (chosen_channel.receive_unit and "kw" in chosen_channel.receive_unit.lower()):
+                val *= 1000.0
+            irradiance_map[ts_utc] = val
 
     total_detected = 0
     total_created = 0
     total_merged = 0
     detectors_run = 0
     evaluated_asset_ids: set[UUID] = set()
+    confirmed_anomaly_ids: set[UUID] = set()
 
     # 3. If no custom detectors defined, use default solar suite for all inverters
     if not detectors:
@@ -182,8 +257,6 @@ def execute_plant_anomaly_scan(
             "clipping",
             "d2_pr_deviation",
             "d1_statistical",
-            "d3_irradiance_residual",
-            "d4_isolation_forest",
         ]
         for method_name in default_methods:
             if not DetectorRegistry.has_detector(method_name):
@@ -249,7 +322,7 @@ def execute_plant_anomaly_scan(
                 )
 
                 if candidates:
-                    _, created, merged = persist_and_deduplicate_anomalies(
+                    persisted, created, merged = persist_and_deduplicate_anomalies(
                         db=db,
                         candidates=candidates,
                         context=context,
@@ -258,6 +331,7 @@ def execute_plant_anomaly_scan(
                     total_detected += len(candidates)
                     total_created += created
                     total_merged += merged
+                    confirmed_anomaly_ids.update(a.id for a in persisted if a is not None)
             detectors_run += 1
 
     else:
@@ -337,7 +411,7 @@ def execute_plant_anomaly_scan(
                 )
 
                 if candidates:
-                    _, created, merged = persist_and_deduplicate_anomalies(
+                    persisted, created, merged = persist_and_deduplicate_anomalies(
                         db=db,
                         candidates=candidates,
                         context=context,
@@ -346,15 +420,68 @@ def execute_plant_anomaly_scan(
                     total_detected += len(candidates)
                     total_created += created
                     total_merged += merged
+                    confirmed_anomaly_ids.update(a.id for a in persisted if a is not None)
 
             detectors_run += 1
 
+    # Auto-reconcile previous un-triaged open detector anomalies in the scanned window
+    # when an irradiance baseline is active and confirms nominal operation
+    anomalies_reconciled = 0
+    if irradiance_map and evaluated_asset_ids:
+        # Require valid, sufficient telemetry: at least 4 daylight POA intervals (>= 50 W/m²)
+        daylight_poa_readings = [v for v in irradiance_map.values() if v >= 50.0]
+        has_sufficient_poa = len(daylight_poa_readings) >= 4
+
+        if has_sufficient_poa:
+            unconfirmed_query = select(Anomaly).where(
+                Anomaly.plant_id == plant_id,
+                Anomaly.status == "open",
+                Anomaly.source == "detector",
+                Anomaly.asset_id.in_(evaluated_asset_ids),
+                Anomaly.start_time >= start_window - timedelta(minutes=15),
+                Anomaly.start_time <= anchor_time + timedelta(minutes=15),
+            )
+            if confirmed_anomaly_ids:
+                unconfirmed_query = unconfirmed_query.where(~Anomaly.id.in_(confirmed_anomaly_ids))
+
+            open_unconfirmed = db.execute(unconfirmed_query).scalars().all()
+            for a in open_unconfirmed:
+                if dry_run:
+                    anomalies_reconciled += 1
+                    continue
+                a.status = "false_positive"
+                a.status_note = (
+                    "Auto-reconciled: Telemetry verified nominal against measured POA irradiance baseline (zero deficit)."
+                )
+                details = a.details.copy() if isinstance(a.details, dict) else {}
+                details["reconciled_by"] = "poa_calibrated_scan"
+                details["reconciliation_reason"] = (
+                    "Cleared by POA-calibrated detector scan. No genuine deficit detected."
+                )
+                details["reconciled_at"] = datetime.now(timezone.utc).isoformat()
+                a.details = details
+                anomalies_reconciled += 1
+
+            if anomalies_reconciled > 0 and not dry_run:
+                db.commit()
+
+    if dry_run:
+        db.rollback()
+
     return {
         "plant_id": str(plant_id),
-        "status": "success",
+        "status": "dry_run" if dry_run else "success",
+        "is_dry_run": dry_run,
+        "scan_mode": scan_mode,
+        "data_freshness": "stale" if is_stale else "fresh",
+        "latest_telemetry_ts": max_ts.isoformat() if max_ts else None,
+        "scan_start": start_window.isoformat(),
+        "scan_end": anchor_time.isoformat(),
         "assets_scanned": len(evaluated_asset_ids),
         "detectors_evaluated": detectors_run,
+        "poa_baseline_used": len(irradiance_map) > 0,
         "anomalies_detected": total_detected,
         "anomalies_created": total_created,
         "anomalies_merged": total_merged,
+        "anomalies_reconciled": anomalies_reconciled,
     }

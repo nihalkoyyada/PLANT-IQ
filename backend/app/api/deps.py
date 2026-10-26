@@ -111,3 +111,26 @@ def enforce_org_access(current_user: User, target_org_id: UUID) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied: Resource belongs to a different organization",
         )
+
+
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Retrieve current authenticated user if valid token is provided, otherwise return None."""
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        if not isinstance(payload, dict):
+            return None
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            return None
+        user = db.get(User, UUID(str(user_id_str)))
+        if user and user.is_active:
+            return user
+    except Exception:
+        return None
+    return None
+

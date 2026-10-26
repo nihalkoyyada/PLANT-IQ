@@ -941,6 +941,7 @@ def tool_render_chart(
         prefix="chart",
         metadata={"title": spec.title, "type": spec.chart_type},
     )
+    rendered_chart_spec["chart_id"] = chart_id
 
     return {
         "status": "rendered",

@@ -12,8 +12,11 @@ import { TelemetryPage } from './pages/TelemetryPage';
 import { IngestionPage } from './pages/IngestionPage';
 import { DataQualityPage } from './pages/DataQualityPage';
 import { AnomaliesPage } from './pages/AnomaliesPage';
+import { CopilotPage } from './pages/CopilotPage';
+import { FloatingCopilot } from './components/copilot/FloatingCopilot';
 import { getPlants } from './api/plants';
 import { Plant } from './types';
+import { CopilotPageContext } from './types/copilot';
 import { Activity, Loader2 } from 'lucide-react';
 
 function AppContent() {
@@ -22,16 +25,35 @@ function AppContent() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [prefilledEmail, setPrefilledEmail] = useState<string>('');
+  const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | null>(null);
+  const [isFloatingCopilotOpen, setIsFloatingCopilotOpen] = useState<boolean>(false);
+  const [floatingPrompt, setFloatingPrompt] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const saved = localStorage.getItem('plantiq_active_tab');
+    if (saved === 'copilot') return 'dashboard';
     return (saved as NavTab) || 'dashboard';
   });
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
 
+  const [pageContext, setPageContext] = useState<CopilotPageContext>({
+    route: activeTab,
+    plantId: selectedPlant?.id,
+    plantName: selectedPlant?.name,
+  });
+
   const userRole = user?.role?.toLowerCase() || 'viewer';
   const canAccessUpload = userRole === 'admin' || userRole === 'engineer';
+
+  useEffect(() => {
+    setPageContext((prev) => ({
+      ...prev,
+      route: activeTab,
+      plantId: selectedPlant?.id || prev.plantId,
+      plantName: selectedPlant?.name || prev.plantName,
+    }));
+  }, [activeTab, selectedPlant]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -96,13 +118,22 @@ function AppContent() {
     }
   };
 
+  const handleAskCopilot = (prompt: string, contextualData?: Partial<CopilotPageContext>) => {
+    if (contextualData) {
+      setPageContext((prev) => ({ ...prev, ...contextualData }));
+    }
+    setFloatingPrompt(prompt);
+    setIsFloatingCopilotOpen(true);
+  };
+
   return (
-    <div className="min-h-screen bg-[#f0f4fa] flex flex-col font-sans">
+    <div className="min-h-screen bg-white flex flex-col font-sans">
       {/* Top Header */}
       <Header
         plants={plants}
         selectedPlant={selectedPlant}
         onSelectPlant={(plant) => setSelectedPlant(plant)}
+        onNavigateTab={handleSelectTab}
       />
 
       {/* Main Container */}
@@ -113,16 +144,39 @@ function AppContent() {
         {/* Main Content View */}
         <main className="flex-1 p-4 md:p-6 overflow-y-auto min-w-0">
           {activeTab === 'dashboard' && (
-            <DashboardPage onNavigateTab={(tab) => handleSelectTab(tab as NavTab)} />
+            <DashboardPage
+              onNavigateTab={(tab) => handleSelectTab(tab as NavTab)}
+              onAskCopilot={handleAskCopilot}
+            />
           )}
-          {activeTab === 'plants' && <PlantsPage />}
-          {activeTab === 'devices' && <DevicesPage />}
-          {activeTab === 'telemetry' && <TelemetryPage />}
-          {activeTab === 'anomalies' && <AnomaliesPage />}
+          {activeTab === 'plants' && (
+            <PlantsPage onNavigateTab={(tab) => handleSelectTab(tab as NavTab)} />
+          )}
+          {activeTab === 'devices' && <DevicesPage onAskCopilot={handleAskCopilot} />}
+          {activeTab === 'telemetry' && <TelemetryPage onAskCopilot={handleAskCopilot} />}
+          {activeTab === 'anomalies' && <AnomaliesPage onAskCopilot={handleAskCopilot} />}
+          {activeTab === 'copilot' && (
+            <CopilotPage
+              selectedPlant={selectedPlant}
+              initialPrompt={copilotInitialPrompt}
+              onClearInitialPrompt={() => setCopilotInitialPrompt(null)}
+            />
+          )}
           {activeTab === 'ingestion' && canAccessUpload && <IngestionPage />}
           {activeTab === 'quality' && <DataQualityPage />}
         </main>
       </div>
+
+      {/* Global Floating AI Copilot Widget across authenticated pages */}
+      <FloatingCopilot
+        selectedPlant={selectedPlant}
+        activeTab={activeTab}
+        pageContext={pageContext}
+        isOpen={isFloatingCopilotOpen}
+        onOpenChange={setIsFloatingCopilotOpen}
+        initialPrompt={floatingPrompt}
+        onClearInitialPrompt={() => setFloatingPrompt(null)}
+      />
 
       {/* Sticky Bottom Navigation Bar (Mobile) */}
       <MobileNav activeTab={activeTab} onSelectTab={handleSelectTab} />

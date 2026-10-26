@@ -635,3 +635,79 @@ def test_legacy_three_records_prevent_fourth_creation(db_session: Session, dedup
     # Count must remain exactly 3!
     assert len(all_anoms_after) == 3
     assert len(all_events_after) == 3
+
+
+def test_different_fault_mechanisms_do_not_incorrectly_merge(db_session: Session, dedup_test_setup: Dict[str, Any]):
+    """Verify that distinct fault mechanisms (e.g. trip vs clipping) on the same asset do NOT merge."""
+    plant = dedup_test_setup["plant"]
+    inverter = dedup_test_setup["inverter"]
+    channel = dedup_test_setup["channel"]
+
+    ctx = DetectorContext(
+        plant_id=plant.id,
+        asset_id=inverter.id,
+        channel_id=channel.id,
+        rated_kw=1250.0,
+        tariff_inr_per_kwh=3.50,
+    )
+
+    t0 = datetime(2026, 6, 1, 10, 0, tzinfo=timezone.utc)
+
+    # 1. Trip candidate (10:00 - 10:30)
+    trip_cand = DetectedAnomaly(
+        start_time=t0,
+        end_time=t0 + timedelta(minutes=30),
+        score=1.0,
+        severity="critical",
+        anomaly_type="trip",
+        summary="Inverter trip detected",
+        loss_kw=1250.0,
+        loss_kwh=625.0,
+    )
+    persisted1, created1, _ = persist_and_deduplicate_anomalies(db_session, [trip_cand], ctx)
+    assert created1 == 1
+    assert persisted1[0].details.get("detector_method") == "trip"
+    assert persisted1[0].event_fingerprint is not None
+
+    # 2. Clipping candidate (10:15 - 11:00) overlapping in time on the SAME inverter
+    clip_cand = DetectedAnomaly(
+        start_time=t0 + timedelta(minutes=15),
+        end_time=t0 + timedelta(minutes=60),
+        score=0.75,
+        severity="medium",
+        anomaly_type="clipping",
+        summary="Abnormal clipping cap detected",
+        loss_kw=200.0,
+        loss_kwh=150.0,
+    )
+    persisted2, created2, merged2 = persist_and_deduplicate_anomalies(db_session, [clip_cand], ctx)
+    # Must NOT merge into trip! Must create a distinct clipping anomaly!
+    assert created2 == 1
+    assert merged2 == 0
+    assert persisted2[0].id != persisted1[0].id
+    assert persisted2[0].details.get("detector_method") == "clipping"
+
+    all_anoms = db_session.execute(select(Anomaly).where(Anomaly.plant_id == plant.id)).scalars().all()
+    assert len(all_anoms) == 2
+
+    # 3. Another trip candidate (10:00 - 10:45) arrives -> MUST merge into trip, NOT into clipping!
+    trip_cand2 = DetectedAnomaly(
+        start_time=t0,
+        end_time=t0 + timedelta(minutes=45),
+        score=1.0,
+        severity="critical",
+        anomaly_type="trip",
+        summary="Extended trip",
+        loss_kw=1250.0,
+        loss_kwh=937.5,
+    )
+    persisted3, created3, merged3 = persist_and_deduplicate_anomalies(db_session, [trip_cand2], ctx)
+    assert created3 == 0
+    assert merged3 == 1
+    assert persisted3[0].id == persisted1[0].id
+    assert persisted3[0].details.get("detector_method") == "trip"
+
+    # Overall DB count is STILL exactly 2 (one trip, one clipping)
+    all_anoms_final = db_session.execute(select(Anomaly).where(Anomaly.plant_id == plant.id)).scalars().all()
+    assert len(all_anoms_final) == 2
+

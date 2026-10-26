@@ -188,37 +188,66 @@ def test_alert_engine_evaluation_and_deduplication(alert_setup: dict):
         db.query(AlertRule).filter(AlertRule.plant_id == alert_setup["plant_a_id"]).delete()
         db.commit()
 
-        # Create rule
-        rule = AlertRule(
-            plant_id=alert_setup["plant_a_id"],
-            name="Midday Inverter Trip Rule",
-            metric="severity",
-            threshold=1.0,
-            direction="above",
-            severity="critical",
-            channels=["email"],
-            enabled=True,
-            config={"recipients": ["critical_ops@plantiq.io"], "smtp_host": "mock"},
+        # Look up or create rule (idempotent lookup to prevent duplicate records)
+        rule = (
+            db.query(AlertRule)
+            .filter(
+                AlertRule.plant_id == alert_setup["plant_a_id"],
+                AlertRule.name == "Midday Inverter Trip Rule",
+            )
+            .first()
         )
-        db.add(rule)
+        if not rule:
+            rule = AlertRule(
+                plant_id=alert_setup["plant_a_id"],
+                name="Midday Inverter Trip Rule",
+                metric="severity",
+                threshold=1.0,
+                direction="above",
+                severity="critical",
+                channels=["email"],
+                enabled=True,
+                config={"recipients": ["critical_ops@plantiq.io"], "smtp_host": "mock"},
+            )
+            db.add(rule)
+            db.commit()
+            db.refresh(rule)
 
-        # Create critical anomaly
-        anomaly = Anomaly(
-            plant_id=alert_setup["plant_a_id"],
-            start_time=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
-            end_time=datetime(2026, 8, 1, 13, 0, tzinfo=timezone.utc),
-            source="detector",
-            score=0.98,
-            severity="critical",
-            status="open",
-            estimated_loss_kw=500.0,
-            summary="Midday trip evaluation test",
-            details={"total_energy_loss_kwh": 500.0},
+        # Look up or create critical anomaly
+        anomaly = (
+            db.query(Anomaly)
+            .filter(
+                Anomaly.plant_id == alert_setup["plant_a_id"],
+                Anomaly.start_time == datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
+                Anomaly.summary == "Midday trip evaluation test",
+            )
+            .first()
         )
-        db.add(anomaly)
+        if not anomaly:
+            anomaly = Anomaly(
+                plant_id=alert_setup["plant_a_id"],
+                start_time=datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc),
+                end_time=datetime(2026, 8, 1, 13, 0, tzinfo=timezone.utc),
+                source="detector",
+                score=0.98,
+                severity="critical",
+                status="open",
+                estimated_loss_kw=500.0,
+                summary="Midday trip evaluation test",
+                details={"total_energy_loss_kwh": 500.0},
+            )
+            db.add(anomaly)
+            db.commit()
+            db.refresh(anomaly)
+        else:
+            anomaly.status = "open"
+            anomaly.details = {"total_energy_loss_kwh": 500.0}
+            db.commit()
+
+        # Clear any prior cooldown/deliveries for this rule to keep test deterministic
+        from app.models.entities import AlertDelivery
+        db.query(AlertDelivery).filter(AlertDelivery.rule_id == rule.id).delete()
         db.commit()
-        db.refresh(rule)
-        db.refresh(anomaly)
 
         # First evaluation: Should dispatch 1 delivery
         deliveries_1 = evaluate_anomaly_alerts(db=db, anomaly=anomaly, cooldown_minutes=60)

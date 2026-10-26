@@ -1,4 +1,4 @@
-﻿"""Provider factory with strict environment-based configuration (NFR-5)."""
+"""Provider factory with strict environment-based configuration (NFR-5)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from app.llm.anthropic import (
 from app.llm.base import BaseProvider
 from app.llm.exceptions import ProviderAuthenticationError, ProviderError
 from app.llm.hooks import UsageRecorder
+from app.llm.mock import DEFAULT_MOCK_MODEL, MockLLMProvider
 from app.llm.openai_compatible import (
     DEFAULT_OPENAI_COMPATIBLE_URL,
     DEFAULT_OPENAI_MODEL,
@@ -31,10 +32,11 @@ def get_llm_provider(
     """Instantiate and return the configured LLM provider.
 
     Environment variables (strictly enforced, NFR-5):
-    - `LLM_PROVIDER`: 'anthropic' or 'openai_compatible' / 'vllm'
+    - `LLM_PROVIDER`: 'mock' (default for offline dev/test), 'anthropic', or 'openai_compatible' / 'vllm'
     - `ANTHROPIC_API_KEY`: Required when provider is anthropic
     - `LLM_MODEL`: Model name override
     - `LLM_BASE_URL`: Base API endpoint URL override
+    - `MOCK_SIMULATE_ERROR`: Optional error simulation (e.g. 'rate_limit', 'auth', 'timeout')
 
     Args:
         provider_name: Override for LLM_PROVIDER env var.
@@ -45,11 +47,28 @@ def get_llm_provider(
         client: Optional httpx.AsyncClient for testing/mocked transports.
 
     Returns:
-        BaseProvider instance (AnthropicProvider or OpenAICompatibleProvider).
+        BaseProvider instance (MockLLMProvider, AnthropicProvider, or OpenAICompatibleProvider).
     """
-    resolved_provider = (
-        provider_name or os.getenv("LLM_PROVIDER") or "anthropic"
-    ).lower().strip()
+    raw_provider = provider_name or os.getenv("LLM_PROVIDER")
+    if not raw_provider:
+        # Default to real provider if keys are configured, otherwise safe mock mode
+        if os.getenv("ANTHROPIC_API_KEY"):
+            resolved_provider = "anthropic"
+        elif os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY"):
+            resolved_provider = "openai_compatible"
+        else:
+            resolved_provider = "mock"
+    else:
+        resolved_provider = raw_provider.lower().strip()
+
+    if resolved_provider in ("mock", "mock_llm", "test", "testing"):
+        resolved_model = model or os.getenv("LLM_MODEL") or DEFAULT_MOCK_MODEL
+        simulate_error = os.getenv("MOCK_SIMULATE_ERROR")
+        return MockLLMProvider(
+            model=resolved_model,
+            simulate_error=simulate_error,
+            usage_recorders=usage_recorders,
+        )
 
     if resolved_provider == "anthropic":
         resolved_key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -87,7 +106,7 @@ def get_llm_provider(
         )
 
     raise ProviderError(
-        f"Unsupported LLM_PROVIDER '{resolved_provider}'. Expected 'anthropic' or 'openai_compatible'.",
+        f"Unsupported LLM_PROVIDER '{resolved_provider}'. Expected 'mock', 'anthropic', or 'openai_compatible'.",
         provider=resolved_provider,
     )
 

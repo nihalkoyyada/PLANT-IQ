@@ -10,9 +10,11 @@ import {
   getLatestPowerReading,
 } from '../api/readings';
 import { Badge } from '../components/common/Badge';
-import { Cpu, X, LineChart as ChartIcon, Zap } from 'lucide-react';
+import { Cpu, X, LineChart as ChartIcon, Zap, Sparkles } from 'lucide-react';
 
-export const DevicesPage: React.FC = () => {
+export const DevicesPage: React.FC<{
+  onAskCopilot?: (prompt: string, context?: any) => void;
+}> = ({ onAskCopilot }) => {
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<DeviceItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -271,6 +273,7 @@ export const DevicesPage: React.FC = () => {
         <DeviceTable
           devices={devices}
           onSelectDevice={(dev) => setSelectedDevice(dev)}
+          onAskCopilot={onAskCopilot}
         />
       )}
 
@@ -385,6 +388,31 @@ export const DevicesPage: React.FC = () => {
                 Last reading: {selectedDevice.lastReading}
               </div>
             </div>
+
+            {/* Contextual Ask Copilot Action Button */}
+            {onAskCopilot && (
+              <button
+                id="btn-drawer-ask-copilot"
+                onClick={() => {
+                  onAskCopilot(
+                    `Analyze operational performance and active power for ${selectedDevice.name} (${selectedDevice.sourceKey}). Status: ${selectedDevice.status}, AC Power: ${
+                      selectedDevice.acPowerKw !== undefined ? selectedDevice.acPowerKw.toFixed(1) + ' kW' : 'N/A'
+                    }, DC Power: ${
+                      selectedDevice.dcPowerKw !== undefined ? selectedDevice.dcPowerKw.toFixed(1) + ' kW' : 'N/A'
+                    }. Identify clipping, temperature derating, or string inverter anomalies.`,
+                    {
+                      route: 'devices',
+                      assetId: selectedDevice.id,
+                      assetName: selectedDevice.name,
+                    }
+                  );
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs shadow-md transition"
+              >
+                <Sparkles className="w-4 h-4 text-sky-200" />
+                <span>Analyze Inverter with Solar Copilot</span>
+              </button>
+            )}
 
             {/* Historical Telemetry */}
             <div className="border-t border-slate-100 pt-4 space-y-3">

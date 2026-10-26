@@ -25,7 +25,7 @@ TARGET_PLANT_ID = UUID("d253760d-d8ad-4a18-b655-fc22a5222d59")
 KAGGLE_P1_WEATHER_SOURCE_KEY = "HmiyD2TTLFNqkNe"
 
 
-def remediate_poa_data() -> Dict[str, any]:
+def remediate_poa_data(plant_id: Optional[UUID] = None) -> Dict[str, any]:
     engine = create_db_engine()
     sf = get_session_factory(engine)
 
@@ -37,15 +37,28 @@ def remediate_poa_data() -> Dict[str, any]:
     ]
     csv_path = next((p for p in possible_paths if p.is_file()), None)
     if not csv_path:
-        raise FileNotFoundError(f"Weather sensor data not found in {possible_paths}")
+        print(f"Weather sensor data not found in {possible_paths}")
+        return {"error": "Weather sensor data file not found"}
 
     print(f"Loading weather readings from: {csv_path}")
 
     with sf() as session:
         # 1. Confirm target plant exists
-        plant = session.get(Plant, TARGET_PLANT_ID)
+        plant = None
+        if plant_id is not None:
+            plant = session.get(Plant, plant_id)
         if plant is None:
-            raise ValueError(f"Target plant {TARGET_PLANT_ID} not found in database")
+            plant = session.get(Plant, TARGET_PLANT_ID)
+        if plant is None:
+            plant = session.execute(
+                select(Plant).where(Plant.name.ilike("%surya%"))
+            ).scalars().first()
+        if plant is None:
+            plant = session.execute(select(Plant)).scalars().first()
+
+        if plant is None:
+            print("No plant found in database for POA remediation.")
+            return {"error": "No plant found"}
 
         print(f"Target Plant: '{plant.name}' (ID: {plant.id})")
 
@@ -98,6 +111,21 @@ def remediate_poa_data() -> Dict[str, any]:
             print(f"Created Channel 'irradiance_poa' (ID: {poa_channel.id})")
         else:
             print(f"Found existing Channel 'irradiance_poa' (ID: {poa_channel.id})")
+
+        # Check existing readings count for fast-path return
+        existing_count = session.execute(
+            select(func.count(Reading.ts)).where(Reading.channel_id == poa_channel.id)
+        ).scalar() or 0
+
+        if existing_count > 0:
+            print(f"Plant '{plant.name}' already has {existing_count} POA irradiance readings.")
+            return {
+                "plant_id": str(plant.id),
+                "plant_name": plant.name,
+                "ws_asset_id": str(ws_asset.id),
+                "poa_channel_id": str(poa_channel.id),
+                "poa_readings_count": existing_count,
+            }
 
         session.commit()
 

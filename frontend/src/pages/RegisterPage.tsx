@@ -20,6 +20,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { registerApi } from '../api/auth';
+import { LiveTelemetryWidget } from '../components/common/LiveTelemetryWidget';
 
 interface RegisterPageProps {
   onNavigateLogin: (registeredEmail?: string) => void;
@@ -209,61 +210,8 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigateLogin }) =
             </div>
           </div>
 
-          {/* Telemetry Visualization Card */}
-          <div className="p-5 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-cyan-500/30 shadow-2xl max-w-md space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-300 font-bold">PLANT GENERATION (MW)</span>
-              <span className="flex items-center gap-1.5 text-emerald-400 font-bold bg-emerald-500/20 px-2.5 py-0.5 rounded-full border border-emerald-500/30 text-[10px]">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                LIVE
-              </span>
-            </div>
-
-            <div className="flex items-end justify-between pt-1 gap-4">
-              {/* Wave SVG Area Chart */}
-              <div className="flex-1 h-14 relative">
-                <svg className="w-full h-full" viewBox="0 0 200 60" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                      <stop offset="100%" stopColor="#0284c7" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M 0,40 Q 30,15 60,30 T 120,20 T 170,35 L 200,25 L 200,60 L 0,60 Z"
-                    fill="url(#cyanGradient)"
-                  />
-                  <path
-                    d="M 0,40 Q 30,15 60,30 T 120,20 T 170,35 L 200,25"
-                    fill="none"
-                    stroke="#38bdf8"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-
-              {/* Power Metrics */}
-              <div className="space-y-1 font-mono text-right shrink-0">
-                <div>
-                  <span className="text-[10px] text-slate-300 uppercase mr-2">AC Power</span>
-                  <span className="text-sm font-bold text-white">24.02 MW</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-300 uppercase mr-2">DC Power</span>
-                  <span className="text-sm font-bold text-sky-300">53.27 MW</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between text-[10px] font-mono text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                SCADA TELEMETRY ACTIVE
-              </span>
-              <span>LAST UPDATE 17:30</span>
-            </div>
-          </div>
+          {/* Real-Time Live Plant Telemetry */}
+          <LiveTelemetryWidget />
 
           {/* Footer Line */}
           <div className="text-[11px] font-mono text-slate-300 flex items-center gap-3">

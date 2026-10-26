@@ -25,6 +25,7 @@ import {
   Sun,
   Layers,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 
 import { Badge } from '../components/common/Badge';
@@ -103,7 +104,9 @@ const getAssetNameForChannel = (channel: Channel, assetsList: Asset[]): string =
  * MAIN TELEMETRY PAGE COMPONENT (S3-FS-02 UI-05 EXPLORER)
  * ========================================================= */
 
-export const TelemetryPage: React.FC = () => {
+export const TelemetryPage: React.FC<{
+  onAskCopilot?: (prompt: string, context?: any) => void;
+}> = ({ onAskCopilot }) => {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -503,6 +506,34 @@ export const TelemetryPage: React.FC = () => {
               <Download className="w-3.5 h-3.5" />
               <span>EXPORT CSV</span>
             </button>
+
+            {/* Contextual Ask Copilot Action Button */}
+            {onAskCopilot && (
+              <button
+                id="btn-telemetry-ask-copilot"
+                onClick={() => {
+                  const selectedChannels = channels.filter((c) => selectedChannelIds.includes(c.id));
+                  const signalNames = selectedChannels.map((c) =>
+                    getHumanMetricName(c.canonical_key, c.source_name)
+                  );
+                  const signalsLabel =
+                    signalNames.length > 0 ? signalNames.join(', ') : 'AC Power & POA Irradiance';
+                  onAskCopilot(
+                    `Explain the selected telemetry trends for ${signalsLabel} from ${appliedRange.start} to ${appliedRange.end} and identify any unusual spikes, tripping, or degradation.`,
+                    {
+                      route: 'telemetry',
+                      selectedSignals: signalNames.length > 0 ? signalNames : ['power_ac'],
+                      dateRange: `${appliedRange.start} to ${appliedRange.end}`,
+                    }
+                  );
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition shadow-xs"
+                title="Analyze Selected Telemetry with Solar Copilot"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>ASK COPILOT</span>
+              </button>
+            )}
           </div>
         </div>
 

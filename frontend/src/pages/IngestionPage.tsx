@@ -208,15 +208,15 @@ export const IngestionPage: React.FC = () => {
   const canonicalLabels: Record<string, { key: string; type: string }> = {
     DATE_TIME: { key: 'timestamp', type: 'ISO 8601' },
     PLANT_ID: { key: 'plant_id', type: 'Global Ref' },
-    SOURCE_KEY: { key: 'device_id', type: 'Asset Inverter' },
+    SOURCE_KEY: { key: 'device_id', type: 'Asset Device' },
     DC_POWER: { key: 'power_dc', type: 'kW' },
     AC_POWER: { key: 'power_ac', type: 'kW' },
     DAILY_YIELD: { key: 'energy_ac_daily', type: 'kWh' },
     TOTAL_YIELD: { key: 'energy_ac_total', type: 'kWh' },
-    IRRADIANCE: { key: 'irradiance', type: 'W/m²' },
-    IRRADIATION: { key: 'irradiation', type: 'W/m²' },
-    AMBIENT_TEMPERATURE: { key: 'ambient_temperature', type: '°C' },
-    MODULE_TEMPERATURE: { key: 'module_temperature', type: '°C' },
+    IRRADIANCE: { key: 'irradiance_poa', type: 'W/m²' },
+    IRRADIATION: { key: 'irradiance_poa', type: 'kW/m²' },
+    AMBIENT_TEMPERATURE: { key: 'temperature_ambient', type: '°C' },
+    MODULE_TEMPERATURE: { key: 'temperature_module', type: '°C' },
   };
 
   const handleUpdateMapping = (rawColumn: string, newMappedKey: string) => {
@@ -241,7 +241,9 @@ export const IngestionPage: React.FC = () => {
           targetType: canon.type,
           confidence: suggestion ? Math.round(suggestion.confidence * 100) : 100,
           sampleData: col.sample_values ? String(col.sample_values[0]) : undefined,
-          notes: col.name === 'SOURCE_KEY' ? 'Mapped to 22 Discrete Inverters' : undefined,
+          notes: col.name === 'SOURCE_KEY'
+            ? (selectedFileName.toLowerCase().includes('weather') ? 'Mapped to Weather Station WS-01' : 'Mapped to 22 Discrete Inverters')
+            : undefined,
           valueSpan: col.min_val !== undefined && col.max_val !== undefined ? `${col.min_val} → ${col.max_val}` : undefined,
         };
       })
@@ -263,14 +265,26 @@ export const IngestionPage: React.FC = () => {
       let targetJobId: string | undefined;
 
       const existingJobs = await getIngestionJobs(currentFileRecord.id);
-      if (existingJobs.length > 0) {
-        targetJobId = existingJobs[0].id;
+      const validCompletedJob = existingJobs.find(
+        (j) => (j.status === 'completed' || j.status === 'done') && (j.qc_summary?.readings_inserted || 0) > 0
+      );
+
+      if (validCompletedJob) {
+        targetJobId = validCompletedJob.id;
       } else {
         const templates = await getMappingTemplates(user?.org_id);
         let templateId: string;
 
-        if (templates.length > 0) {
-          templateId = templates[0].id;
+        // Find an existing template whose mapped columns match this specific file
+        const fileCols = new Set(profileData?.columns.map((c) => c.name.toUpperCase()) || []);
+        const matchingTemplate = templates.find((t) => {
+          const tCols = Object.keys(t.mappings || {}).map((k) => k.toUpperCase());
+          const specificCols = tCols.filter((c) => !['DATE_TIME', 'PLANT_ID', 'SOURCE_KEY'].includes(c));
+          return specificCols.length > 0 && specificCols.every((c) => fileCols.has(c));
+        });
+
+        if (matchingTemplate) {
+          templateId = matchingTemplate.id;
         } else {
           const mappingsObj: Record<string, string> = {};
           mappingItems.forEach((m) => {
@@ -280,7 +294,7 @@ export const IngestionPage: React.FC = () => {
           if (!Object.values(mappingsObj).includes('timestamp')) {
             mappingsObj['DATE_TIME'] = 'timestamp';
           }
-          if (!Object.values(mappingsObj).includes('source_key')) {
+          if (!Object.values(mappingsObj).includes('source_key') && !Object.values(mappingsObj).includes('device_id')) {
             mappingsObj['SOURCE_KEY'] = 'source_key';
           }
 
@@ -378,7 +392,7 @@ export const IngestionPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">Upload &amp; Mapping</h1>
-            <Badge variant="emerald">● LIVE 15M CADENCE</Badge>
+            <Badge variant="emerald">● LIVE TELEMETRY</Badge>
           </div>
           <p className="text-xs text-slate-500 font-mono mt-0.5">
             Ingest raw SCADA time-series files (CSV, Parquet, ZIP) into PostgreSQL / TimescaleDB

@@ -198,6 +198,15 @@ __all__ = [
     "DetectorBenchmarkResult",
     "CAREBenchmarkSuite",
     "CAREBenchmarkEngine",
+    # Root Cause Analysis Workflow (FR-7.1, Task S6-AI-01)
+    "DiagnosticContextAggregator",
+    "DiagnosticContextPayload",
+    "RCAWorkflowEngine",
+    "RCANarrativeReport",
+    "RankedCause",
+    "RCAEvidenceLink",
+    "RCATelemetrySummary",
+    "RCARequest",
 ]
 from app.ai.care_benchmark import (
     CAREBenchmarkEngine,
@@ -206,6 +215,20 @@ from app.ai.care_benchmark import (
     DetectorBenchmarkResult,
     GroundTruthEvent,
     LeadTimeMetrics,
+)
+from app.ai.rca_context import (
+    DiagnosticContextAggregator,
+    DiagnosticContextPayload,
+)
+from app.ai.rca_engine import (
+    RCAWorkflowEngine,
+)
+from app.schemas.rca import (
+    RCANarrativeReport,
+    RankedCause,
+    RCAEvidenceLink,
+    RCATelemetrySummary,
+    RCARequest,
 )
 
 

@@ -111,6 +111,11 @@ def surya_evidence_fixture():
                     db.add(anm)
                     db.commit()
                     db.refresh(anm)
+                else:
+                    anm.start_time = t_start
+                    anm.end_time = t_end
+                    anm.summary = f"Generation deficit on {ast.name}"
+                    db.commit()
                 AnomalyCalculationService.recalculate_anomaly_record(db, anm)
                 db.commit()
                 db.refresh(anm)

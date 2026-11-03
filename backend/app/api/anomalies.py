@@ -34,6 +34,8 @@ from app.schemas.anomaly import (
     BulkAnomalyTriageRequest,
     BulkAnomalyTriageResponse,
 )
+from app.ai.rca_engine import RCAWorkflowEngine
+from app.schemas.rca import RCANarrativeReport, RCARequest
 from app.tasks.detector_tasks import execute_plant_anomaly_scan
 
 
@@ -595,23 +597,46 @@ def get_anomaly_evidence(
         "type": "calculated_reference",
     })
 
-    # 2. Algorithmic Root Cause Analysis: dynamically attributed from telemetry signatures and loss gradients
-    rca_result = AnomalyCalculationService.generate_root_cause_analysis(
-        asset_name=anomaly.asset_name or (anomaly.asset.name if anomaly.asset else "Inverter"),
-        severity=anomaly.severity,
-        detector_method=detector_method,
-        summary=anomaly.summary or "",
-        rated_kw=rated_kw,
-        peak_deficit_kw=peak_deficit_kw,
-        calc_loss_kwh=calc_loss_kwh,
-        data_points=data_points,
-        start_time=anom_start,
-        end_time=anom_end,
-        existing_rca=anomaly.rca_narrative,
-    )
-    ranked_hypotheses = rca_result.ranked_hypotheses
-    recommended_checks = rca_result.recommended_checks
-    rca_obj = rca_result.rca_narrative
+    # 2. Root Cause Analysis: use persisted structured RCA report if present, else compute algorithmic attribution
+    if anomaly.rca_narrative and isinstance(anomaly.rca_narrative, dict) and "ranked_causes" in anomaly.rca_narrative:
+        rca_obj = anomaly.rca_narrative
+        ranked_hypotheses = [
+            {
+                "rank": c.get("rank", idx + 1),
+                "hypothesis": c.get("cause", ""),
+                "confidence": float(c.get("probability", 0.0)),
+                "description": c.get("rationale", ""),
+                "category": c.get("category", "General"),
+            }
+            for idx, c in enumerate(rca_obj.get("ranked_causes", []))
+        ]
+        if "recommended_checks" in rca_obj and rca_obj["recommended_checks"]:
+            recommended_checks = rca_obj["recommended_checks"]
+        if "evidence_links" in rca_obj and rca_obj["evidence_links"]:
+            for el in rca_obj["evidence_links"]:
+                supporting_evidence.append({
+                    "label": el.get("source", "Evidence"),
+                    "value": str(el.get("observed_value", "")),
+                    "status": el.get("status", "outlier"),
+                    "type": "rca_evidence_link",
+                })
+    else:
+        rca_result = AnomalyCalculationService.generate_root_cause_analysis(
+            asset_name=anomaly.asset_name or (anomaly.asset.name if anomaly.asset else "Inverter"),
+            severity=anomaly.severity,
+            detector_method=detector_method,
+            summary=anomaly.summary or "",
+            rated_kw=rated_kw,
+            peak_deficit_kw=peak_deficit_kw,
+            calc_loss_kwh=calc_loss_kwh,
+            data_points=data_points,
+            start_time=anom_start,
+            end_time=anom_end,
+            existing_rca=anomaly.rca_narrative,
+        )
+        ranked_hypotheses = rca_result.ranked_hypotheses
+        recommended_checks = rca_result.recommended_checks
+        rca_obj = rca_result.rca_narrative
 
     return AnomalyEvidenceResponse(
         anomaly_id=anomaly.id,
@@ -674,3 +699,77 @@ def trigger_plant_anomaly_scan(
         dry_run=dry_run,
     )
     return result
+
+
+@router.post(
+    "/{anomaly_id}/explain",
+    response_model=RCANarrativeReport,
+    status_code=status.HTTP_200_OK,
+    summary="Trigger Root Cause Analysis (RCA) Workflow (FR-7.1, Task S6-AI-01)",
+)
+async def explain_anomaly(
+    anomaly_id: UUID,
+    request: RCARequest = RCARequest(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Trigger the multi-channel diagnostic RCA workflow for an anomaly.
+
+    Aggregates:
+    - Pre-fault and intra-fault telemetry leading up to the failure.
+    - Weather / environmental insolation data.
+    - Peer inverter baselines to isolate asset vs systemic failure.
+    - SCADA alarms, fault codes, and trip events.
+
+    Generates:
+    - Chronological human-readable narrative.
+    - Potential failure factors explicitly ranked by probability.
+    - Concrete evidence links pointing to timestamps and sensor logs.
+    - Prioritized physical field checks.
+
+    Persists the report back into the anomaly record within PostgreSQL/TimescaleDB.
+    """
+    anomaly = db.get(Anomaly, anomaly_id)
+    if anomaly is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Anomaly not found")
+
+    enforce_org_access(current_user, anomaly.plant.org_id)
+
+    engine = RCAWorkflowEngine()
+    try:
+        report = await engine.execute_rca(
+            db=db,
+            anomaly_id=anomaly_id,
+            user_id=current_user.id,
+            pre_window_hours=request.pre_window_hours,
+            post_window_hours=request.post_window_hours,
+            force_regenerate=request.force_regenerate,
+        )
+        return report
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"RCA Diagnostic Workflow failed: {exc}",
+        )
+
+
+@router.post(
+    "/{anomaly_id}/rca",
+    response_model=RCANarrativeReport,
+    status_code=status.HTTP_200_OK,
+    summary="Alias for /explain (FR-7.1, Task S6-AI-01)",
+)
+async def rca_anomaly_alias(
+    anomaly_id: UUID,
+    request: RCARequest = RCARequest(),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Alias for /explain."""
+    return await explain_anomaly(
+        anomaly_id=anomaly_id,
+        request=request,
+        db=db,
+        current_user=current_user,
+    )
+

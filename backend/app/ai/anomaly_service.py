@@ -491,10 +491,10 @@ class AnomalyCalculationService:
             max_consec = 1
             plateau_val = 0.0
 
+        midday_zero_pts = sum(1 for b, o in zip(base_vals, obs_vals) if o <= 5.0 and b >= 20.0) if daylight_pts else 0
         # Classification & Dynamic Confidence derivation
         is_trip = (
-            min_obs <= 5.0
-            or zero_drop_pts >= 1
+            midday_zero_pts >= 1
             or "trip" in summary_lower
             or "trip" in detector_lower
         )

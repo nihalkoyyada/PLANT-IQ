@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Sliders, Database, Check, X } from 'lucide-react';
+import { CheckCircle2, Sliders, Database, Check, X, Layers, Loader2, Eye } from 'lucide-react';
 import { Badge } from '../common/Badge';
 
 export interface ColumnMappingItem {
@@ -30,6 +30,14 @@ export const CANONICAL_SIGNAL_OPTIONS = [
   { key: 'grid_frequency', label: 'grid_frequency (Frequency - Hz)', type: 'Hz' },
 ];
 
+export interface SelectedFileTab {
+  id: string;
+  name: string;
+  isWeather: boolean;
+  rowCount?: number;
+  colCount?: number;
+}
+
 interface SignalMapperProps {
   fileName?: string;
   rowCount?: number;
@@ -37,6 +45,11 @@ interface SignalMapperProps {
   mappings: ColumnMappingItem[];
   onConfirmAll?: () => void;
   onUpdateMapping?: (rawColumn: string, newMappedKey: string, newTargetType?: string) => void;
+  selectedFiles?: SelectedFileTab[];
+  activeFileId?: string;
+  onSelectFileToView?: (fileId: string) => void;
+  onOpenSchemaModal?: (fileId?: string) => void;
+  isLoading?: boolean;
 }
 
 export const SignalMapper: React.FC<SignalMapperProps> = ({
@@ -46,6 +59,11 @@ export const SignalMapper: React.FC<SignalMapperProps> = ({
   mappings = [],
   onConfirmAll,
   onUpdateMapping,
+  selectedFiles = [],
+  activeFileId,
+  onSelectFileToView,
+  onOpenSchemaModal,
+  isLoading = false,
 }) => {
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [customName, setCustomName] = useState<string>('');
@@ -86,6 +104,67 @@ export const SignalMapper: React.FC<SignalMapperProps> = ({
         </div>
       </div>
 
+      {/* Selected Datasets Tabs when 2 or more files are selected */}
+      {selectedFiles && selectedFiles.length > 1 && (
+        <div className="bg-sky-50/60 p-3 rounded-xl border border-sky-200/80 space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] font-mono">
+            <span className="font-bold text-sky-900 flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5 text-sky-700" />
+              PARSED SCHEMAS FOR SELECTED DATASETS ({selectedFiles.length}):
+            </span>
+            <span className="text-slate-500">Switch tabs or click View Signals to open schema preview</span>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            {selectedFiles.map((sf) => {
+              const isCurrent = sf.id === activeFileId;
+              return (
+                <div
+                  key={sf.id}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition border ${
+                    isCurrent
+                      ? 'bg-white text-sky-900 border-sky-500 shadow-xs ring-2 ring-sky-300'
+                      : 'bg-white/80 hover:bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    id={`tab-schema-${sf.id}`}
+                    onClick={() => onSelectFileToView && onSelectFileToView(sf.id)}
+                    className="flex items-center gap-2 cursor-pointer text-left hover:text-sky-800"
+                    title={`Switch schema view to ${sf.name}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-sky-600 animate-pulse' : 'bg-slate-300'}`} />
+                    <span className="truncate max-w-[170px]" title={sf.name}>{sf.name}</span>
+                    <Badge variant={sf.isWeather ? 'emerald' : 'navy'}>
+                      {sf.isWeather ? 'Weather (WS-01)' : 'Generation (Inverters)'}
+                    </Badge>
+                  </button>
+
+                  <button
+                    type="button"
+                    id={`btn-view-signals-${sf.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onSelectFileToView && !isCurrent) onSelectFileToView(sf.id);
+                      if (onOpenSchemaModal) onOpenSchemaModal(sf.id);
+                    }}
+                    className={`ml-1 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition shadow-2xs ${
+                      isCurrent
+                        ? 'bg-sky-600 hover:bg-sky-700 text-white border border-sky-700'
+                        : 'bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300'
+                    }`}
+                    title="Click to view schema & signals in dedicated viewer"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>VIEW SIGNALS ↗</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Target Plant Summary Banner */}
       <div className="bg-sky-50/80 rounded-xl p-4 border border-sky-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -123,19 +202,14 @@ export const SignalMapper: React.FC<SignalMapperProps> = ({
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono text-slate-500">
           <span className="font-bold text-slate-700">DETECTED SIGNALS ({mappings.length})</span>
-          {onConfirmAll && mappings.length > 0 && (
-            <button
-              type="button"
-              onClick={onConfirmAll}
-              className="px-4 py-2 bg-[#004874] hover:bg-[#003354] text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center justify-center gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Confirm &amp; Execute Ingestion</span>
-            </button>
-          )}
         </div>
 
-        {mappings.length === 0 ? (
+        {isLoading ? (
+          <div className="p-10 text-center bg-slate-50/80 rounded-xl border border-slate-200 text-slate-500 font-mono text-xs flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-sky-600" />
+            <span>Profiling schema &amp; detected signals for {fileName}...</span>
+          </div>
+        ) : mappings.length === 0 ? (
           <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-400 font-mono text-xs space-y-1">
             <strong className="text-slate-600 font-bold block">No Signals Registered</strong>
             <span>Upload a SCADA CSV or Parquet file to trigger automated schema profiling &amp; signal mapping.</span>
@@ -240,17 +314,6 @@ export const SignalMapper: React.FC<SignalMapperProps> = ({
           ))
         )}
       </div>
-
-      {onConfirmAll && mappings.length > 0 && (
-        <button
-          type="button"
-          onClick={onConfirmAll}
-          className="w-full py-2.5 bg-[#004874] hover:bg-[#003354] text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center justify-center gap-2"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Confirm Signal Mappings &amp; Execute Ingestion</span>
-        </button>
-      )}
     </div>
   );
 };

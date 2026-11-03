@@ -9,7 +9,7 @@ import csv
 import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -25,7 +25,7 @@ TARGET_PLANT_ID = UUID("d253760d-d8ad-4a18-b655-fc22a5222d59")
 KAGGLE_P1_WEATHER_SOURCE_KEY = "HmiyD2TTLFNqkNe"
 
 
-def remediate_poa_data(plant_id: Optional[UUID] = None) -> Dict[str, any]:
+def remediate_poa_data(plant_id: Optional[UUID] = None) -> Dict[str, Any]:
     engine = create_db_engine()
     sf = get_session_factory(engine)
 
@@ -89,28 +89,40 @@ def remediate_poa_data(plant_id: Optional[UUID] = None) -> Dict[str, any]:
         else:
             print(f"Found existing Asset 'WS-01' (ID: {ws_asset.id})")
 
-        # 3. Find or create irradiance_poa channel
-        poa_channel = session.execute(
-            select(Channel).where(
-                Channel.asset_id == ws_asset.id,
-                Channel.canonical_key == "irradiance_poa",
-            )
-        ).scalar_one_or_none()
+        # 3. Find or create weather channels: irradiance_poa, temperature_ambient, temperature_module
+        ws_channels_spec = [
+            ("irradiance_poa", "IRRADIATION", "kW/m²"),
+            ("temperature_ambient", "AMBIENT_TEMPERATURE", "degC"),
+            ("temperature_module", "MODULE_TEMPERATURE", "degC"),
+        ]
+        ws_channel_map: Dict[str, Channel] = {}
 
-        if poa_channel is None:
-            poa_channel = Channel(
-                asset_id=ws_asset.id,
-                canonical_key="irradiance_poa",
-                source_name="IRRADIATION",
-                receive_unit="kW/m²",
-                interval_s=900,
-                agg_semantics="avg",
-            )
-            session.add(poa_channel)
-            session.flush()
-            print(f"Created Channel 'irradiance_poa' (ID: {poa_channel.id})")
-        else:
-            print(f"Found existing Channel 'irradiance_poa' (ID: {poa_channel.id})")
+        for can_key, src_name, r_unit in ws_channels_spec:
+            ch = session.execute(
+                select(Channel).where(
+                    Channel.asset_id == ws_asset.id,
+                    Channel.canonical_key == can_key,
+                )
+            ).scalar_one_or_none()
+            if ch is None:
+                ch = Channel(
+                    asset_id=ws_asset.id,
+                    canonical_key=can_key,
+                    source_name=src_name,
+                    receive_unit=r_unit,
+                    interval_s=900,
+                    agg_semantics="avg",
+                )
+                session.add(ch)
+                session.flush()
+                print(f"Created Channel '{can_key}' (ID: {ch.id})")
+            else:
+                print(f"Found existing Channel '{can_key}' (ID: {ch.id})")
+            ws_channel_map[can_key] = ch
+
+        poa_channel = ws_channel_map["irradiance_poa"]
+        amb_channel = ws_channel_map["temperature_ambient"]
+        mod_channel = ws_channel_map["temperature_module"]
 
         # Check existing readings count for fast-path return
         existing_count = session.execute(
@@ -139,15 +151,33 @@ def remediate_poa_data(plant_id: Optional[UUID] = None) -> Dict[str, any]:
                     dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
                 except ValueError:
                     continue
-                irrad_val = float(row["IRRADIATION"]) if row.get("IRRADIATION") else 0.0
-                weather_readings.append({
-                    "channel_id": poa_channel.id,
-                    "ts": dt,
-                    "value": irrad_val,
-                    "quality": 100,
-                })
 
-        print(f"Parsed {len(weather_readings)} rows from weather CSV")
+                if row.get("IRRADIATION") is not None:
+                    irrad_val = float(row["IRRADIATION"])
+                    weather_readings.append({
+                        "channel_id": poa_channel.id,
+                        "ts": dt,
+                        "value": irrad_val,
+                        "quality": 100,
+                    })
+                if row.get("AMBIENT_TEMPERATURE") is not None:
+                    amb_val = float(row["AMBIENT_TEMPERATURE"])
+                    weather_readings.append({
+                        "channel_id": amb_channel.id,
+                        "ts": dt,
+                        "value": amb_val,
+                        "quality": 100,
+                    })
+                if row.get("MODULE_TEMPERATURE") is not None:
+                    mod_val = float(row["MODULE_TEMPERATURE"])
+                    weather_readings.append({
+                        "channel_id": mod_channel.id,
+                        "ts": dt,
+                        "value": mod_val,
+                        "quality": 100,
+                    })
+
+        print(f"Parsed {len(weather_readings)} weather readings from CSV")
 
         # 5. Idempotent bulk upsert into readings table
         # PostgreSQL ON CONFLICT (channel_id, ts) DO UPDATE

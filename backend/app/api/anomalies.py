@@ -199,10 +199,10 @@ def get_anomalies_summary(
 
     total = len(canonical_anomalies)
     open_count = sum(1 for a in canonical_anomalies if a.status == "open")
-    critical_count = sum(1 for a in canonical_anomalies if a.severity == "critical" and a.status == "open")
-    high_count = sum(1 for a in canonical_anomalies if a.severity == "high" and a.status == "open")
-    medium_count = sum(1 for a in canonical_anomalies if a.severity == "medium" and a.status == "open")
-    low_count = sum(1 for a in canonical_anomalies if a.severity == "low" and a.status == "open")
+    critical_count = sum(1 for a in canonical_anomalies if a.severity == "critical")
+    high_count = sum(1 for a in canonical_anomalies if a.severity == "high")
+    medium_count = sum(1 for a in canonical_anomalies if a.severity == "medium")
+    low_count = sum(1 for a in canonical_anomalies if a.severity == "low")
 
     return AnomalySummary(
         total_anomalies=total,

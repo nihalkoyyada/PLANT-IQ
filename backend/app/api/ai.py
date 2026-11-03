@@ -70,6 +70,17 @@ def profile_file_endpoint(
 
         profile_dict = profile_res.to_dict()
 
+        # Format mapping suggestions to ensure both raw_column & raw_header,
+        # canonical_key & suggested_canonical_key, confidence & confidence_score are present
+        formatted_suggestions = []
+        for s in mapping_res.suggestions:
+            d = s.to_dict()
+            d["raw_column"] = d.get("raw_header")
+            d["canonical_key"] = d.get("suggested_canonical_key")
+            d["confidence"] = d.get("confidence_score")
+            d["reason"] = d.get("reasoning")
+            formatted_suggestions.append(d)
+
         return AIProfileResponse(
             file_path=profile_res.file_path,
             file_name=profile_res.file_name,
@@ -79,7 +90,7 @@ def profile_file_endpoint(
             column_count=profile_res.column_count,
             columns=profile_dict.get("columns", []),
             timestamp_profile=profile_dict.get("timestamp_profile"),
-            mapping_suggestions=[s.to_dict() for s in mapping_res.suggestions],
+            mapping_suggestions=formatted_suggestions,
             profiling_duration_ms=profile_res.profiling_duration_ms,
         )
 

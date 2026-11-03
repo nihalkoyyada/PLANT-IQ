@@ -62,6 +62,18 @@ const getHumanMetricName = (canonicalKey: string, sourceName: string): string =>
   const key = (canonicalKey || '').toLowerCase();
   const src = (sourceName || '').toUpperCase();
 
+  if (key === 'irradiance_poa' || key === 'irradiance' || src.includes('IRRADIANCE')) {
+    return 'POA Irradiance';
+  }
+  if (key === 'temperature_ambient' || src.includes('AMBIENT')) {
+    return 'Ambient Temp';
+  }
+  if (key === 'temperature_module' || src.includes('MODULE')) {
+    return 'Module Temp';
+  }
+  if (key.includes('temp') || src.includes('TEMP')) {
+    return 'Temperature';
+  }
   if (key === 'power_ac' || src.includes('AC_POWER') || src.includes('AC POWER')) {
     return 'AC Power';
   }
@@ -84,12 +96,6 @@ const getHumanMetricName = (canonicalKey: string, sourceName: string): string =>
   ) {
     return 'Total Energy';
   }
-  if (key === 'irradiance' || src.includes('IRRADIANCE')) {
-    return 'Irradiance';
-  }
-  if (key.includes('temp') || src.includes('TEMP')) {
-    return 'Temperature';
-  }
 
   const raw = canonicalKey || sourceName || 'Signal';
   return raw
@@ -98,6 +104,8 @@ const getHumanMetricName = (canonicalKey: string, sourceName: string): string =>
 };
 
 const getMetricIcon = (metricName: string) => {
+  if (metricName.includes('Irradiance') || metricName.includes('POA')) return <Sun className="w-3.5 h-3.5 text-amber-500" />;
+  if (metricName.includes('Temp')) return <Activity className="w-3.5 h-3.5 text-sky-500" />;
   if (metricName.includes('AC Power')) return <Zap className="w-3.5 h-3.5 text-amber-500" />;
   if (metricName.includes('DC Power')) return <Sun className="w-3.5 h-3.5 text-amber-600" />;
   if (metricName.includes('Daily Energy') || metricName.includes('Total Energy')) {
@@ -137,7 +145,12 @@ export const AssetTree: React.FC<AssetTreeProps> = ({
     // Helper to format channel node
     const formatChannelNode = (c: Channel): InternalChannelNode => {
       const metricName = getHumanMetricName(c.canonical_key, c.source_name);
-      const defaultUnit = metricName.includes('Energy') ? 'kWh' : 'kW';
+      let defaultUnit = metricName.includes('Energy') ? 'kWh' : 'kW';
+      if (metricName.includes('Irradiance') || c.canonical_key === 'irradiance_poa') {
+        defaultUnit = 'kW/m²';
+      } else if (metricName.includes('Temp') || c.canonical_key.includes('temperature')) {
+        defaultUnit = '°C';
+      }
       return {
         id: c.id,
         canonicalKey: c.canonical_key,
@@ -471,7 +484,11 @@ export const AssetTree: React.FC<AssetTreeProps> = ({
                                         <Square className="w-3.5 h-3.5 text-slate-300" />
                                       )}
                                     </button>
-                                    <Cpu className="w-3.5 h-3.5 text-amber-500" />
+                                    {inv.assetType === 'weather_station' || inv.name === 'WS-01' ? (
+                                      <Sun className="w-3.5 h-3.5 text-amber-500" />
+                                    ) : (
+                                      <Cpu className="w-3.5 h-3.5 text-amber-500" />
+                                    )}
                                     <span className="truncate flex-1 font-medium">{inv.name}</span>
                                   </div>
 

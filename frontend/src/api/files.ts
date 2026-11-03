@@ -234,3 +234,30 @@ export const uploadFile = async (
 
   return response.data;
 };
+
+export interface ActiveTelemetrySourceItem {
+  file_id: string;
+  original_name: string;
+  readings_count: number;
+  channels_count?: number;
+  assets_count?: number;
+  dataset_type?: 'weather' | 'generation' | 'hybrid' | string;
+  has_completed_job?: boolean;
+  latest_ts?: string | null;
+  earliest_ts?: string | null;
+  size_bytes: number;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface ActiveTelemetrySourcesResponse {
+  active_sources: ActiveTelemetrySourceItem[];
+  active_dataset_names: string[];
+  total_active_sources: number;
+  all_files: ActiveTelemetrySourceItem[];
+}
+
+export const getActiveTelemetrySources = async (): Promise<ActiveTelemetrySourcesResponse> => {
+  const response = await apiClient.get<ActiveTelemetrySourcesResponse>('/files/active-telemetry-sources');
+  return response.data;
+};

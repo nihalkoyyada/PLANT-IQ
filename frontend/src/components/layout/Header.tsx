@@ -17,18 +17,20 @@ import {
   Sun,
   User as UserIcon,
   X,
+  Database,
 } from 'lucide-react';
 import { Plant, Asset, Channel, Anomaly } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { NavTab } from './Sidebar';
 import { getAssets } from '../../api/assets';
 import { getChannels } from '../../api/channels';
+import { useActiveDatasets } from '../../utils/activeDataset';
 import { getAnomalies } from '../../api/anomalies';
 
 interface HeaderProps {
-  plants: Plant[];
-  selectedPlant: Plant | null;
-  onSelectPlant: (plant: Plant) => void;
+  plants?: Plant[];
+  selectedPlant?: Plant | null;
+  onSelectPlant?: (plant: Plant) => void;
   onNavigateTab?: (tab: NavTab) => void;
 }
 
@@ -50,12 +52,13 @@ interface NotificationItem {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  plants,
+  plants = [],
   selectedPlant,
-  onSelectPlant,
+  onSelectPlant = () => {},
   onNavigateTab,
 }) => {
   const { user, logout } = useAuth();
+  const { activeDatasets } = useActiveDatasets();
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
 
   // Search state
@@ -323,9 +326,36 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Live Telemetry Badge */}
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 rounded-md border border-emerald-200/80 text-[11px] font-mono font-medium text-emerald-700">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          LIVE TELEMETRY
+        {activeDatasets.length > 0 ? (
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 rounded-md border border-emerald-200/80 text-[11px] font-mono font-medium text-emerald-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE TELEMETRY
+          </div>
+        ) : (
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200 text-[11px] font-mono font-medium text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-slate-400" />
+            STANDBY
+          </div>
+        )}
+
+        {/* Active Telemetry Dataset Pill */}
+        <div
+          id="header-active-dataset-pill"
+          data-testid="header-active-dataset-pill"
+          className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono font-medium ${
+            activeDatasets.length > 0
+              ? 'bg-sky-50 border-sky-200/80 text-sky-800'
+              : 'bg-slate-50 border-slate-200 text-slate-500'
+          }`}
+          title={`Active Telemetry Feed: ${activeDatasets.join(', ') || 'None'}`}
+        >
+          <Database className={`w-3.5 h-3.5 flex-shrink-0 ${activeDatasets.length > 0 ? 'text-sky-600' : 'text-slate-400'}`} />
+          <span className="text-slate-500 font-normal">FEED{activeDatasets.length > 1 ? ` (${activeDatasets.length})` : ''}:</span>
+          <span className="font-bold truncate max-w-[180px] lg:max-w-[260px] text-slate-800">
+            {activeDatasets.length > 0
+              ? activeDatasets.join(', ')
+              : 'None'}
+          </span>
         </div>
       </div>
 

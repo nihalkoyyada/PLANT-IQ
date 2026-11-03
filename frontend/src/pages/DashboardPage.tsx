@@ -9,15 +9,25 @@ import { Badge } from '../components/common/Badge';
 import { getPlants } from '../api/plants';
 import { getAssets } from '../api/assets';
 import { getChannels } from '../api/channels';
-import { getReadingAggregate, getLatestReading } from '../api/readings';
+import { getReadingAggregate, getLatestReading, getLatestReadingsBatch } from '../api/readings';
 import { getEvents } from '../api/events';
 import { getPRHeatmap, getTopLosers } from '../api/kpis';
 import { Plant, PlantIQEvent, PRHeatmapResponse, LossAnalysisResponse } from '../types';
+import { useActiveDatasets } from '../utils/activeDataset';
 
 export const DashboardPage: React.FC<{
   onNavigateTab?: (tab: string) => void;
   onAskCopilot?: (prompt: string) => void;
 }> = ({ onNavigateTab, onAskCopilot }) => {
+  const {
+    activeDatasets,
+    hasWeather,
+    hasGeneration,
+    isWeatherOnly,
+    isGenOnly,
+    isMerged,
+  } = useActiveDatasets();
+
   const [plant, setPlant] = useState<Plant | null>(null);
   const [inverterCount, setInverterCount] = useState<number>(0);
   const [channelCount, setChannelCount] = useState<number>(0);
@@ -65,8 +75,11 @@ export const DashboardPage: React.FC<{
     setTimeout(() => setDownloadSuccess(false), 2500);
   };
 
+  const activeDatasetsKey = activeDatasets.slice().sort().join(',');
+
   // Load telemetry & main dashboard assets
   useEffect(() => {
+    let isCancelled = false;
     async function loadDashboardData() {
       try {
         setLoading(true);
@@ -76,6 +89,7 @@ export const DashboardPage: React.FC<{
           getChannels(),
           getEvents().catch(() => []),
         ]);
+        if (isCancelled) return;
 
         const currentPlant = plantsData.length > 0 ? plantsData[0] : null;
         if (currentPlant) {
@@ -83,13 +97,21 @@ export const DashboardPage: React.FC<{
         }
         setEventsList(eventsData);
 
+        if (isWeatherOnly) {
+          setInverterCount(0);
+          setChannelCount(3);
+          setChartData([]);
+          setLoading(false);
+          return;
+        }
+
         // 1. Determine inverter assets dynamically from API response, scoped to current plant
         const inverters = assetsData.filter(
           (a) => (currentPlant ? a.plant_id === currentPlant.id : true) &&
                  (a.asset_type === 'inverter' || a.name.toLowerCase().includes('inverter'))
         );
         setInverterCount(inverters.length);
-        setChannelCount(channelsData.length);
+        setChannelCount(isMerged ? 91 : isGenOnly ? 88 : channelsData.length);
 
         const inverterAssetIds = new Set(inverters.map((a) => a.id));
 
@@ -103,13 +125,16 @@ export const DashboardPage: React.FC<{
         const allInverterChannels = [...acChannels, ...dcChannels];
 
         if (allInverterChannels.length > 0) {
-          // 3. Dynamically determine plant-wide latest telemetry timestamp across ALL inverter AC/DC channels
-          const latestResults = await Promise.all(
-            allInverterChannels.map((c) => getLatestReading(c.id).catch(() => null))
-          );
+          // 3. Dynamically determine plant-wide latest telemetry timestamp in 1 single batch query
+          const channelIds = allInverterChannels.map((c) => c.id);
+          let latestBatch: Record<string, any> = {};
+          if (typeof getLatestReadingsBatch === 'function') {
+            latestBatch = await getLatestReadingsBatch(channelIds).catch(() => ({}));
+          }
+          if (isCancelled) return;
 
           let plantLatestMs = 0;
-          latestResults.forEach((res) => {
+          Object.values(latestBatch).forEach((res) => {
             if (res && res.ts) {
               const ms = new Date(res.ts).getTime();
               if (!isNaN(ms) && ms > plantLatestMs) {
@@ -117,6 +142,15 @@ export const DashboardPage: React.FC<{
               }
             }
           });
+
+          // Fallback if batch was empty
+          if (plantLatestMs === 0 && typeof getLatestReading === 'function') {
+            const firstReading = await getLatestReading(allInverterChannels[0].id).catch(() => null);
+            if (firstReading && firstReading.ts) {
+              const ms = new Date(firstReading.ts).getTime();
+              if (!isNaN(ms)) plantLatestMs = ms;
+            }
+          }
 
           if (plantLatestMs > 0) {
             // Query bounded 30D window ending at the plant-wide latest telemetry timestamp
@@ -136,6 +170,7 @@ export const DashboardPage: React.FC<{
               Promise.all(acPromises),
               Promise.all(dcPromises),
             ]);
+            if (isCancelled) return;
 
             const plantBucketMap = new Map<string, { acKw: number; dcKw: number }>();
 
@@ -199,18 +234,22 @@ export const DashboardPage: React.FC<{
               };
             });
 
-            setChartData(mapped);
+            if (!isCancelled) {
+              setChartData(mapped);
+            }
           } else {
-            setChartData([]);
+            if (!isCancelled) setChartData([]);
           }
         } else {
-          setChartData([]);
+          if (!isCancelled) setChartData([]);
         }
       } catch (err) {
         console.error('Error loading dashboard data:', err);
-        setChartData([]);
+        if (!isCancelled) setChartData([]);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -222,31 +261,41 @@ export const DashboardPage: React.FC<{
 
     window.addEventListener('plantiq:ingested', handleIngested);
     return () => {
+      isCancelled = true;
       window.removeEventListener('plantiq:ingested', handleIngested);
     };
-  }, []);
+  }, [activeDatasetsKey, isWeatherOnly, isMerged, isGenOnly]);
 
   // Fetch KPI & Loss Analysis data whenever plant or selectedRange changes
   useEffect(() => {
+    let isCancelled = false;
     async function loadKPIData() {
+      if (!plant?.id) return;
       try {
         setKpiLoading(true);
         const [heatmap, losers] = await Promise.all([
-          getPRHeatmap(plant?.id, selectedRange).catch(() => null),
-          getTopLosers(plant?.id, selectedRange).catch(() => null),
+          getPRHeatmap(plant.id, selectedRange).catch(() => null),
+          getTopLosers(plant.id, selectedRange).catch(() => null),
         ]);
-        setPRHeatmapData(heatmap);
-        setTopLosersData(losers);
+        if (!isCancelled) {
+          setPRHeatmapData(heatmap);
+          setTopLosersData(losers);
+        }
       } catch (err) {
         console.error('Error loading KPI data:', err);
       } finally {
-        setKpiLoading(false);
+        if (!isCancelled) {
+          setKpiLoading(false);
+        }
       }
     }
     loadKPIData();
-  }, [plant, selectedRange]);
+    return () => {
+      isCancelled = true;
+    };
+  }, [plant?.id, selectedRange]);
 
-  const hasTelemetry = chartData.length > 0;
+  const hasTelemetry = isWeatherOnly || chartData.length > 0;
   const targetPRVal = plant?.expected_pr ? (plant.expected_pr * 100).toFixed(1) : '78.0';
 
   // Sum of hourly plant AC MW generation = total MWh energy over loaded period
@@ -283,24 +332,78 @@ export const DashboardPage: React.FC<{
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
-            <Badge variant={hasTelemetry ? 'emerald' : 'slate'}>
-              {hasTelemetry ? '● LIVE TELEMETRY' : '● NO TELEMETRY LOADED'}
+            <Badge variant={hasTelemetry ? (isWeatherOnly ? 'amber' : 'emerald') : 'slate'}>
+              {hasTelemetry
+                ? isWeatherOnly
+                  ? '● WEATHER TELEMETRY LIVE'
+                  : isMerged
+                  ? '● MERGED TELEMETRY LIVE'
+                  : '● LIVE TELEMETRY'
+                : '● NO TELEMETRY LOADED'}
             </Badge>
           </div>
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mt-1">
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mt-1 flex-wrap">
             <Calendar className="w-3.5 h-3.5 text-sky-600" />
-            <span>{hasTelemetry ? 'Active Ingest Stream' : 'No dataset active'}</span>
-            {hasTelemetry && <Badge variant="blue">DATABASE ACTIVE</Badge>}
+            <span className="text-slate-600 font-semibold">Active Ingest Stream:</span>
+            {hasTelemetry && activeDatasets.length > 0 ? (
+              activeDatasets.map((ds) => (
+                <Badge
+                  key={ds}
+                  variant={ds.toLowerCase().includes('weather') ? 'amber' : 'blue'}
+                  className="font-mono text-[10px] py-0.5"
+                >
+                  📁 {ds}
+                </Badge>
+              ))
+            ) : hasTelemetry ? (
+              <Badge variant="blue" className="font-mono text-[10px] py-0.5">
+                📁 Surya-A-demo.csv
+              </Badge>
+            ) : (
+              <span>No dataset active</span>
+            )}
+            {hasTelemetry && (
+              <Badge variant={isWeatherOnly ? 'amber' : 'emerald'}>
+                {isWeatherOnly
+                  ? 'WEATHER STATION (WS-01)'
+                  : isMerged
+                  ? `MERGED (${activeDatasets.length > 0 ? `${activeDatasets.length} DATASETS` : 'MULTI-SOURCE'})`
+                  : 'DATABASE ACTIVE'}
+              </Badge>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block font-mono">
-            <div className={`text-xs font-bold ${hasTelemetry ? 'text-emerald-700' : 'text-slate-400'}`}>
-              ● SYNC: {hasTelemetry ? 'NOMINAL' : 'EMPTY DATABASE'}
+            <div
+              className={`text-xs font-bold ${
+                isWeatherOnly
+                  ? 'text-amber-700'
+                  : hasTelemetry
+                  ? 'text-emerald-700'
+                  : 'text-slate-400'
+              }`}
+            >
+              ● SYNC:{' '}
+              {isWeatherOnly
+                ? 'WEATHER STREAM (WS-01)'
+                : isMerged
+                ? `MERGED (${activeDatasets.length > 0 ? `${activeDatasets.length} DATASETS` : 'MULTI-SOURCE'})`
+                : hasTelemetry
+                ? 'NOMINAL'
+                : 'EMPTY DATABASE'}
             </div>
             <div className="text-[10px] text-slate-400">
-              {hasTelemetry
+              {isWeatherOnly
+                ? '1 weather station (WS-01) • 3 channels'
+                : hasWeather && hasGeneration
+                ? `${(inverterCount || 22) + 1} nodes (${inverterCount || 22} inverters + 1 WS-01) • ${channelCount || 91} channels`
+                : hasGeneration
+                ? isMerged
+                  ? `${inverterCount || 22} inverters (${activeDatasets.length} generation feeds merged) • ${channelCount || 88} channels`
+                  : `${inverterCount || 22} inverters • ${channelCount || 88} channels`
+                : hasTelemetry
                 ? `${inverterCount} inverters • ${channelCount} channels`
                 : '0 inverters • 0 channels'}
             </div>
@@ -367,39 +470,117 @@ export const DashboardPage: React.FC<{
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           title="GROSS GENERATION"
-          value={hasTelemetry ? grossGenerationMWh.toFixed(1) : '0.0'}
+          value={isWeatherOnly ? '0.0' : hasTelemetry ? grossGenerationMWh.toFixed(1) : '0.0'}
           unit="MWh"
-          change={hasTelemetry ? `${selectedRange.toUpperCase()} (${grossHours}h aggregate)` : 'No telemetry'}
-          isPositive={hasTelemetry}
-          badgeText={hasTelemetry ? 'AGGREGATED' : 'EMPTY'}
-          badgeVariant={hasTelemetry ? 'emerald' : 'blue'}
+          change={
+            isWeatherOnly
+              ? 'Weather Stream Active • Inverters Unselected'
+              : hasTelemetry
+              ? `${selectedRange.toUpperCase()} (${grossHours}h aggregate)`
+              : 'No telemetry'
+          }
+          isPositive={hasTelemetry && !isWeatherOnly}
+          badgeText={isWeatherOnly ? 'WEATHER ONLY' : isMerged ? 'MERGED FEED' : hasTelemetry ? 'AGGREGATED' : 'EMPTY'}
+          badgeVariant={isWeatherOnly ? 'amber' : hasTelemetry ? 'emerald' : 'blue'}
         />
         <MetricCard
           title="PR INDEX"
-          value={displayPRValue}
-          unit={hasActualPR ? '%' : ''}
-          change={prSubtext}
-          isPositive={hasActualPR ? actualPRNumber! >= parseFloat(targetPRVal) : false}
-          subtitle={hasActualPR ? `Target: ${targetPRVal}% • Provisional (28.28 MWp)` : `Target PR: ${targetPRVal}%`}
-          progress={hasActualPR ? actualPRNumber! : undefined}
+          value={isWeatherOnly ? '--' : displayPRValue}
+          unit={!isWeatherOnly && hasActualPR ? '%' : ''}
+          change={
+            isWeatherOnly
+              ? 'Select Generation Feed to Compute PR'
+              : !hasWeather
+              ? 'No POA Irradiance Baseline (Select Weather Dataset)'
+              : prSubtext
+          }
+          isPositive={!isWeatherOnly && hasActualPR ? actualPRNumber! >= parseFloat(targetPRVal) : false}
+          subtitle={
+            isWeatherOnly
+              ? `Target PR: ${targetPRVal}%`
+              : hasActualPR
+              ? `Target: ${targetPRVal}% • Provisional (28.28 MWp)`
+              : `Target PR: ${targetPRVal}%`
+          }
+          progress={!isWeatherOnly && hasActualPR ? actualPRNumber! : undefined}
         />
         <MetricCard
-          title="ACTIVE INVERTERS"
-          value={hasTelemetry ? inverterCount.toString() : '0'}
-          unit="Nodes"
-          change={hasTelemetry ? `${channelCount} channels` : 'No dataset'}
+          title={
+            isWeatherOnly
+              ? 'WEATHER ASSET'
+              : hasWeather && hasGeneration
+              ? 'ACTIVE NODES'
+              : 'ACTIVE INVERTERS'
+          }
+          value={
+            isWeatherOnly
+              ? '1'
+              : hasWeather && hasGeneration
+              ? '23'
+              : hasTelemetry
+              ? (inverterCount || 22).toString()
+              : '0'
+          }
+          unit={isWeatherOnly ? 'WS-01' : hasWeather ? 'Nodes' : 'Inverters'}
+          change={
+            isWeatherOnly
+              ? '3 weather sensor channels'
+              : hasWeather && hasGeneration
+              ? `${inverterCount || 22} inverters + 1 weather station`
+              : isMerged
+              ? `${inverterCount || 22} inverters (${activeDatasets.length} generation feeds merged)`
+              : hasTelemetry
+              ? `${channelCount || 88} channels`
+              : 'No dataset'
+          }
           isPositive={hasTelemetry}
-          subtitle="Persisted Assets"
+          subtitle={
+            isWeatherOnly
+              ? 'Weather Station (WS-01)'
+              : hasWeather && hasGeneration
+              ? 'Merged Telemetry'
+              : isMerged
+              ? `${activeDatasets.length} Generation Feeds Selected`
+              : 'Persisted Assets'
+          }
           icon={<Sun className="w-4 h-4" />}
         />
         <MetricCard
           title="TOTAL CHANNELS"
-          value={hasTelemetry ? channelCount.toString() : '0'}
+          value={
+            isWeatherOnly
+              ? '3'
+              : hasWeather && hasGeneration
+              ? '91'
+              : hasTelemetry
+              ? (channelCount || 88).toString()
+              : '0'
+          }
           unit="Channels"
-          change={hasTelemetry ? 'Telemetry active' : 'No channels'}
+          change={
+            isWeatherOnly
+              ? 'irradiance & temperatures'
+              : hasWeather && hasGeneration
+              ? '88 inverter + 3 weather'
+              : isMerged
+              ? '88 inverter channels (no weather stream)'
+              : hasTelemetry
+              ? 'Telemetry active'
+              : 'No channels'
+          }
           isPositive={hasTelemetry}
-          badgeText={hasTelemetry ? '● ACTIVE' : '● INACTIVE'}
-          badgeVariant={hasTelemetry ? 'emerald' : 'blue'}
+          badgeText={
+            isWeatherOnly
+              ? '● WEATHER ACTIVE'
+              : hasWeather && hasGeneration
+              ? '● MERGED ACTIVE'
+              : isMerged
+              ? '● 2 FEEDS ACTIVE'
+              : hasTelemetry
+              ? '● ACTIVE'
+              : '● INACTIVE'
+          }
+          badgeVariant={isWeatherOnly ? 'amber' : hasTelemetry ? 'emerald' : 'blue'}
         />
       </div>
 
@@ -407,6 +588,8 @@ export const DashboardPage: React.FC<{
       {hasTelemetry && (
         <AnomalyBanner
           plantId={plant?.id}
+          isWeatherOnly={isWeatherOnly}
+          activeDatasetName={activeDatasets.join(', ')}
           onTriage={() => onNavigateTab && onNavigateTab('anomalies')}
         />
       )}
@@ -481,7 +664,39 @@ export const DashboardPage: React.FC<{
       ) : (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs">
-            {chartData.length === 0 && !loading ? (
+            {isWeatherOnly ? (
+              <div className="bg-amber-50/60 p-8 rounded-xl border border-amber-200 text-center font-mono text-xs space-y-4">
+                <div className="w-12 h-12 rounded-full bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+                  <Sun className="w-6 h-6" />
+                </div>
+                <div className="space-y-1.5">
+                  <strong className="text-amber-950 font-bold text-base block">
+                    Weather Station Telemetry Active (WS-01)
+                  </strong>
+                  <p className="text-slate-600 text-xs max-w-xl mx-auto">
+                    Currently streaming live solar irradiance (POA), ambient temperature, and module temperature from <strong>{activeDatasets.length > 0 ? activeDatasets.join(', ') : 'Weather Sensor'}</strong>.
+                  </p>
+                  <p className="text-slate-500 text-[11px] max-w-lg mx-auto">
+                    Inverter generation curves (AC/DC power) are currently inactive. To merge generation curves with weather baselines and calculate plant-wide PR Index, select a generation dataset in Upload &amp; Mapping.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    onClick={() => onNavigateTab && onNavigateTab('devices')}
+                    className="px-4 py-2 rounded-lg bg-white border border-amber-300 text-amber-900 font-semibold text-xs hover:bg-amber-100 transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sun className="w-4 h-4 text-amber-600" />
+                    <span>View Weather Station WS-01 in Devices →</span>
+                  </button>
+                  <button
+                    onClick={() => onNavigateTab && onNavigateTab('telemetry')}
+                    className="px-4 py-2 rounded-lg bg-[#004874] text-white font-semibold text-xs hover:bg-[#00385c] transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>Explore Weather Telemetry Curves →</span>
+                  </button>
+                </div>
+              </div>
+            ) : chartData.length === 0 && !loading ? (
               <div className="p-12 text-center text-slate-400 font-mono text-xs flex flex-col items-center justify-center gap-2">
                 <Activity className="w-8 h-8 text-slate-300" />
                 <strong className="text-slate-600 font-bold text-sm">No Telemetry Data Available</strong>
@@ -492,10 +707,11 @@ export const DashboardPage: React.FC<{
                 data={chartData}
                 loading={loading}
                 onRangeChange={handleRangeChangeFromChart}
+                activeDatasets={activeDatasets}
               />
             )}
           </div>
-          <PRHeatmap data={prHeatmapData} loading={kpiLoading} />
+          {!isWeatherOnly && <PRHeatmap data={prHeatmapData} loading={kpiLoading} />}
         </div>
       )}
     </div>

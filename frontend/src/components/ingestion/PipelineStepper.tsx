@@ -11,6 +11,8 @@ interface PipelineStepperProps {
   progress?: number;
   isIngesting?: boolean;
   onProceed?: () => void;
+  proceedButtonText?: string;
+  disabled?: boolean;
 }
 
 export const PipelineStepper: React.FC<PipelineStepperProps> = ({
@@ -22,6 +24,8 @@ export const PipelineStepper: React.FC<PipelineStepperProps> = ({
   progress = 0,
   isIngesting = false,
   onProceed,
+  proceedButtonText,
+  disabled = false,
 }) => {
   const steps = [
     { id: 1, label: 'UPLOAD' },
@@ -117,11 +121,33 @@ export const PipelineStepper: React.FC<PipelineStepperProps> = ({
       {/* Proceed Button */}
       {onProceed && !isIngesting && (
         <button
-          onClick={onProceed}
-          className="w-full py-2.5 bg-[#004874] hover:bg-[#003354] text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center justify-center gap-2 border border-sky-300/30"
+          id="btn-pipeline-execute-ingest"
+          onClick={disabled ? undefined : onProceed}
+          disabled={disabled}
+          className={`w-full py-2.5 text-xs font-semibold rounded-lg shadow-sm transition flex items-center justify-center gap-2 border ${
+            disabled
+              ? 'bg-emerald-50 text-emerald-800 border-emerald-200 cursor-default shadow-xs'
+              : 'bg-[#004874] hover:bg-[#003354] text-white border-sky-300/30 cursor-pointer shadow-md'
+          }`}
+          title={
+            disabled
+              ? 'Selected dataset(s) are already ingested into SCADA database. Ingestion will be re-enabled if a new dataset is uploaded.'
+              : 'Execute SCADA ingestion pipeline'
+          }
         >
-          <span>Confirm Signal Mappings &amp; Execute Ingestion</span>
-          <ArrowRight className="w-4 h-4" />
+          {disabled ? (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span className="font-semibold text-emerald-900 truncate">
+                {proceedButtonText || 'Ingestion Completed • Telemetry Live'}
+              </span>
+            </>
+          ) : (
+            <>
+              <span>{proceedButtonText || 'Confirm Signal Mappings & Execute Ingestion'}</span>
+              <ArrowRight className="w-4 h-4 flex-shrink-0" />
+            </>
+          )}
         </button>
       )}
     </div>

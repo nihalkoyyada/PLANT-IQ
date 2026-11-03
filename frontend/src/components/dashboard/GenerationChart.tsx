@@ -23,6 +23,7 @@ interface GenerationChartProps {
   data: ChartPoint[];
   loading?: boolean;
   onRangeChange?: (range: '24H' | '7D' | '30D') => void;
+  activeDatasets?: string[];
 }
 
 const formatMonthDay = (date: Date): string => {
@@ -70,7 +71,12 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export const GenerationChart: React.FC<GenerationChartProps> = ({ data, loading, onRangeChange }) => {
+export const GenerationChart: React.FC<GenerationChartProps> = ({
+  data,
+  loading,
+  onRangeChange,
+  activeDatasets,
+}) => {
   const [timeRange, setTimeRange] = useState<'24H' | '7D' | '30D'>('24H');
 
   // Process data, calculate KPIs dynamically for active timeRange, and downsample for optimal visualization
@@ -245,9 +251,20 @@ export const GenerationChart: React.FC<GenerationChartProps> = ({ data, loading,
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div>
-          <h3 className="text-base font-bold text-slate-900 tracking-tight">AC vs DC Power Generation</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base font-bold text-slate-900 tracking-tight">AC vs DC Power Generation</h3>
+            {activeDatasets && activeDatasets.length > 0 && (
+              <span
+                data-testid="chart-active-feed-badge"
+                className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-sky-50 text-sky-800 border border-sky-200"
+              >
+                📁 {activeDatasets.length > 1 ? `FEED (${activeDatasets.length} DATASETS): ` : 'FEED: '}
+                {activeDatasets.join(' & ')}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            AC and DC power generation throughout the selected time period.
+            AC and DC power generation throughout the selected time period{activeDatasets && activeDatasets.length > 0 ? ` • Source: ${activeDatasets.join(', ')}` : ''}.
           </p>
         </div>
 

@@ -15,6 +15,10 @@ import { getReadingAggregate } from '../../api/readings';
 interface DeviceChartProps {
   acChannelId?: string;
   dcChannelId?: string;
+  irradianceChannelId?: string;
+  ambientTempChannelId?: string;
+  moduleTempChannelId?: string;
+  assetType?: string;
   latestTimestamp?: string;
 }
 
@@ -24,11 +28,18 @@ interface ChartPoint {
   fullTimeLabel: string;
   acPowerKw?: number | null;
   dcPowerKw?: number | null;
+  irradiance?: number | null;
+  ambientTemp?: number | null;
+  moduleTemp?: number | null;
 }
 
 export const DeviceChart: React.FC<DeviceChartProps> = ({
   acChannelId,
   dcChannelId,
+  irradianceChannelId,
+  ambientTempChannelId,
+  moduleTempChannelId,
+  assetType,
   latestTimestamp,
 }) => {
   const [range, setRange] = useState<'24H' | '7D'>('24H');
@@ -36,8 +47,13 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
+  const isWeatherStation =
+    assetType === 'weather_station' ||
+    assetType === 'weather_sensor' ||
+    Boolean(irradianceChannelId);
+
   const fetchChartData = async () => {
-    if (!acChannelId && !dcChannelId) {
+    if (!acChannelId && !dcChannelId && !irradianceChannelId && !ambientTempChannelId) {
       setLoading(false);
       setChartData([]);
       return;
@@ -61,94 +77,189 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
       const startIso = new Date(anchorDate.getTime() - hoursBack * 60 * 60 * 1000).toISOString();
       const interval = range === '24H' ? '15min' : 'hour';
 
-      // 2. Query aggregate readings for AC and DC channels
-      const [acAggs, dcAggs] = await Promise.all([
-        acChannelId
-          ? getReadingAggregate({ channel_id: acChannelId, start: startIso, end: endIso, interval }).catch(() => [])
-          : Promise.resolve([]),
-        dcChannelId
-          ? getReadingAggregate({ channel_id: dcChannelId, start: startIso, end: endIso, interval }).catch(() => [])
-          : Promise.resolve([]),
-      ]);
-
-      let finalAcAggs = acAggs;
-      let finalDcAggs = dcAggs;
-
-      // Fallback: If range-filtered query returned empty, query min/max range for the channel
-      if (finalAcAggs.length === 0 && finalDcAggs.length === 0) {
-        const [fallbackAc, fallbackDc] = await Promise.all([
-          acChannelId
-            ? getReadingAggregate({ channel_id: acChannelId, interval }).catch(() => [])
+      // 2. Query aggregate readings for channels
+      if (isWeatherStation) {
+        const [irradAggs, ambAggs, modAggs] = await Promise.all([
+          irradianceChannelId
+            ? getReadingAggregate({ channel_id: irradianceChannelId, start: startIso, end: endIso, interval }).catch(() => [])
             : Promise.resolve([]),
-          dcChannelId
-            ? getReadingAggregate({ channel_id: dcChannelId, interval }).catch(() => [])
+          ambientTempChannelId
+            ? getReadingAggregate({ channel_id: ambientTempChannelId, start: startIso, end: endIso, interval }).catch(() => [])
+            : Promise.resolve([]),
+          moduleTempChannelId
+            ? getReadingAggregate({ channel_id: moduleTempChannelId, start: startIso, end: endIso, interval }).catch(() => [])
             : Promise.resolve([]),
         ]);
-        finalAcAggs = fallbackAc;
-        finalDcAggs = fallbackDc;
-      }
 
-      if (finalAcAggs.length === 0 && finalDcAggs.length === 0) {
-        setChartData([]);
-        setLoading(false);
-        return;
-      }
+        let finalIrrad = irradAggs;
+        let finalAmb = ambAggs;
+        let finalMod = modAggs;
 
-      // 3. Process & Align Telemetry Data
-      const timeMap: Record<string, { acKw?: number; dcKw?: number }> = {};
-
-      finalAcAggs.forEach((item) => {
-        if (!item.start) return;
-        const ts = new Date(item.start).toISOString();
-        if (item.average_value !== undefined && item.average_value !== null) {
-          const raw = Number(item.average_value);
-          const kw = raw > 500.0 ? raw / 1000.0 : raw;
-          if (!timeMap[ts]) timeMap[ts] = {};
-          timeMap[ts].acKw = Math.max(0, Number(kw.toFixed(2)));
+        if (finalIrrad.length === 0 && finalAmb.length === 0 && finalMod.length === 0) {
+          const [fbIrrad, fbAmb, fbMod] = await Promise.all([
+            irradianceChannelId ? getReadingAggregate({ channel_id: irradianceChannelId, interval }).catch(() => []) : Promise.resolve([]),
+            ambientTempChannelId ? getReadingAggregate({ channel_id: ambientTempChannelId, interval }).catch(() => []) : Promise.resolve([]),
+            moduleTempChannelId ? getReadingAggregate({ channel_id: moduleTempChannelId, interval }).catch(() => []) : Promise.resolve([]),
+          ]);
+          finalIrrad = fbIrrad;
+          finalAmb = fbAmb;
+          finalMod = fbMod;
         }
-      });
 
-      finalDcAggs.forEach((item) => {
-        if (!item.start) return;
-        const ts = new Date(item.start).toISOString();
-        if (item.average_value !== undefined && item.average_value !== null) {
-          const raw = Number(item.average_value);
-          let kw = raw > 50000.0 ? raw / 1000.0 : (raw > 5000.0 ? raw / 10.0 : raw);
-          if (timeMap[ts]?.acKw !== undefined && timeMap[ts].acKw! > 0) {
-            const ac = timeMap[ts].acKw!;
-            if (raw / 10.0 >= ac * 0.5 && raw / 10.0 <= ac * 1.8) {
-              kw = raw / 10.0;
-            } else if (raw / 1000.0 >= ac * 0.5 && raw / 1000.0 <= ac * 1.8) {
-              kw = raw / 1000.0;
-            }
+        if (finalIrrad.length === 0 && finalAmb.length === 0 && finalMod.length === 0) {
+          setChartData([]);
+          setLoading(false);
+          return;
+        }
+
+        const timeMap: Record<string, { irradiance?: number; ambientTemp?: number; moduleTemp?: number }> = {};
+        finalIrrad.forEach((item) => {
+          if (!item.start) return;
+          const ts = new Date(item.start).toISOString();
+          if (item.average_value !== undefined && item.average_value !== null) {
+            const raw = Number(item.average_value);
+            const val = raw > 50.0 ? raw / 1000.0 : raw;
+            if (!timeMap[ts]) timeMap[ts] = {};
+            timeMap[ts].irradiance = Math.max(0, Number(val.toFixed(3)));
           }
-          if (!timeMap[ts]) timeMap[ts] = {};
-          timeMap[ts].dcKw = Math.max(0, Number(kw.toFixed(2)));
+        });
+        finalAmb.forEach((item) => {
+          if (!item.start) return;
+          const ts = new Date(item.start).toISOString();
+          if (item.average_value !== undefined && item.average_value !== null) {
+            if (!timeMap[ts]) timeMap[ts] = {};
+            timeMap[ts].ambientTemp = Number(Number(item.average_value).toFixed(1));
+          }
+        });
+        finalMod.forEach((item) => {
+          if (!item.start) return;
+          const ts = new Date(item.start).toISOString();
+          if (item.average_value !== undefined && item.average_value !== null) {
+            if (!timeMap[ts]) timeMap[ts] = {};
+            timeMap[ts].moduleTemp = Number(Number(item.average_value).toFixed(1));
+          }
+        });
+
+        const sortedTimestamps = Object.keys(timeMap).sort(
+          (a, b) => new Date(a).getTime() - new Date(b).getTime()
+        );
+
+        const points: ChartPoint[] = sortedTimestamps.map((ts) => {
+          const date = new Date(ts);
+          const timeLabel = range === '24H'
+            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+            : `${date.toLocaleDateString([], { month: 'short', day: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+          const fullTimeLabel = `${date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+
+          return {
+            timestamp: ts,
+            timeLabel,
+            fullTimeLabel,
+            irradiance: timeMap[ts].irradiance !== undefined ? timeMap[ts].irradiance : null,
+            ambientTemp: timeMap[ts].ambientTemp !== undefined ? timeMap[ts].ambientTemp : null,
+            moduleTemp: timeMap[ts].moduleTemp !== undefined ? timeMap[ts].moduleTemp : null,
+          };
+        });
+
+        setChartData(points);
+      } else {
+        // Query aggregate readings for AC and DC channels
+        const [acAggs, dcAggs] = await Promise.all([
+          acChannelId
+            ? getReadingAggregate({ channel_id: acChannelId, start: startIso, end: endIso, interval }).catch(() => [])
+            : Promise.resolve([]),
+          dcChannelId
+            ? getReadingAggregate({ channel_id: dcChannelId, start: startIso, end: endIso, interval }).catch(() => [])
+            : Promise.resolve([]),
+        ]);
+
+        let finalAcAggs = acAggs;
+        let finalDcAggs = dcAggs;
+
+        // Fallback: If range-filtered query returned empty, query min/max range for the channel
+        if (finalAcAggs.length === 0 && finalDcAggs.length === 0) {
+          const [fallbackAc, fallbackDc] = await Promise.all([
+            acChannelId
+              ? getReadingAggregate({ channel_id: acChannelId, interval }).catch(() => [])
+              : Promise.resolve([]),
+            dcChannelId
+              ? getReadingAggregate({ channel_id: dcChannelId, interval }).catch(() => [])
+              : Promise.resolve([]),
+          ]);
+          finalAcAggs = fallbackAc;
+          finalDcAggs = fallbackDc;
         }
-      });
 
-      const sortedTimestamps = Object.keys(timeMap).sort(
-        (a, b) => new Date(a).getTime() - new Date(b).getTime()
-      );
+        if (finalAcAggs.length === 0 && finalDcAggs.length === 0) {
+          setChartData([]);
+          setLoading(false);
+          return;
+        }
 
-      const points: ChartPoint[] = sortedTimestamps.map((ts) => {
-        const date = new Date(ts);
-        const timeLabel = range === '24H'
-          ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
-          : `${date.toLocaleDateString([], { month: 'short', day: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+        // 3. Process & Align Telemetry Data
+        const timeMap: Record<string, { acKw?: number; dcKw?: number }> = {};
 
-        const fullTimeLabel = `${date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+        finalAcAggs.forEach((item) => {
+          if (!item.start) return;
+          const ts = new Date(item.start).toISOString();
+          if (item.average_value !== undefined && item.average_value !== null) {
+            const raw = Number(item.average_value);
+            // In solar string inverters, raw AC power is in kW (0 to ~1500 kW).
+            // Only if stored in Watts (> 50,000) should it be divided by 1,000.
+            const kw = raw > 50000.0 ? raw / 1000.0 : raw;
+            if (!timeMap[ts]) timeMap[ts] = {};
+            timeMap[ts].acKw = Math.max(0, Number(kw.toFixed(2)));
+          }
+        });
 
-        return {
-          timestamp: ts,
-          timeLabel,
-          fullTimeLabel,
-          acPowerKw: timeMap[ts].acKw !== undefined ? timeMap[ts].acKw : null,
-          dcPowerKw: timeMap[ts].dcKw !== undefined ? timeMap[ts].dcKw : null,
-        };
-      });
+        finalDcAggs.forEach((item) => {
+          if (!item.start) return;
+          const ts = new Date(item.start).toISOString();
+          if (item.average_value !== undefined && item.average_value !== null) {
+            const raw = Number(item.average_value);
+            // DC power in SCADA datasets is stored in deci-kW (10x kW, 0 to ~15,000).
+            // Convert to kW to align with AC power.
+            let kw = raw;
+            if (raw > 50000.0) {
+              kw = raw / 1000.0;
+            } else if (raw > 2500.0) {
+              kw = raw / 10.0;
+            } else if (timeMap[ts]?.acKw !== undefined && timeMap[ts].acKw! > 0) {
+              const ac = timeMap[ts].acKw!;
+              if (raw >= ac * 5.0) {
+                kw = raw / 10.0;
+              }
+            } else if (raw > 25.0) {
+              kw = raw / 10.0;
+            }
+            if (!timeMap[ts]) timeMap[ts] = {};
+            timeMap[ts].dcKw = Math.max(0, Number(kw.toFixed(2)));
+          }
+        });
 
-      setChartData(points);
+        const sortedTimestamps = Object.keys(timeMap).sort(
+          (a, b) => new Date(a).getTime() - new Date(b).getTime()
+        );
+
+        const points: ChartPoint[] = sortedTimestamps.map((ts) => {
+          const date = new Date(ts);
+          const timeLabel = range === '24H'
+            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+            : `${date.toLocaleDateString([], { month: 'short', day: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+
+          const fullTimeLabel = `${date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}`;
+
+          return {
+            timestamp: ts,
+            timeLabel,
+            fullTimeLabel,
+            acPowerKw: timeMap[ts].acKw !== undefined ? timeMap[ts].acKw : null,
+            dcPowerKw: timeMap[ts].dcKw !== undefined ? timeMap[ts].dcKw : null,
+          };
+        });
+
+        setChartData(points);
+      }
     } catch (err: any) {
       console.error('Error fetching device historical telemetry:', err);
       setError('Failed to load historical telemetry data.');
@@ -159,7 +270,7 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
 
   useEffect(() => {
     fetchChartData();
-  }, [acChannelId, dcChannelId, latestTimestamp, range]);
+  }, [acChannelId, dcChannelId, irradianceChannelId, ambientTempChannelId, moduleTempChannelId, latestTimestamp, range]);
 
   if (loading) {
     return (
@@ -192,9 +303,11 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
     return (
       <div className="bg-slate-50 p-6 rounded-xl border border-slate-200/80 text-center font-mono text-xs text-slate-500 space-y-2">
         <Activity className="w-6 h-6 text-slate-400 mx-auto" />
-        <p className="font-semibold text-slate-700">No historical telemetry available for this inverter.</p>
+        <p className="font-semibold text-slate-700">
+          {isWeatherStation ? 'No historical weather readings available.' : 'No historical telemetry available for this inverter.'}
+        </p>
         <span className="text-[10px] text-slate-400">
-          No 5-minute or 15-minute readings found in the database for the selected channels.
+          No aggregate readings found in the database for the selected channels.
         </span>
       </div>
     );
@@ -206,7 +319,7 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
       <div className="flex items-center justify-between text-xs font-mono">
         <span className="text-slate-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-          Telemetry Trend ({range})
+          {isWeatherStation ? 'Weather Station Telemetry Trend' : 'Inverter Telemetry Trend'} ({range})
         </span>
 
         <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-md border border-slate-700">
@@ -229,7 +342,7 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
       {/* Recharts Container */}
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 10, right: 15, left: 10, bottom: 0 }}>
             <defs>
               <linearGradient id="acGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
@@ -238,6 +351,18 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
               <linearGradient id="dcGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#fbbf24" stopOpacity={0.4} />
                 <stop offset="95%" stopColor="#fbbf24" stopOpacity={0.0} />
+              </linearGradient>
+              <linearGradient id="irradGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+              </linearGradient>
+              <linearGradient id="ambGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.0} />
+              </linearGradient>
+              <linearGradient id="modGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
               </linearGradient>
             </defs>
 
@@ -256,7 +381,8 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
               tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'monospace' }}
               tickLine={false}
               axisLine={{ stroke: '#334155' }}
-              unit=" kW"
+              width={55}
+              unit={isWeatherStation ? '' : ' kW'}
             />
 
             <Tooltip
@@ -268,17 +394,42 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
                       <div className="text-[11px] font-bold text-slate-400 border-b border-slate-800 pb-1">
                         {pt.fullTimeLabel}
                       </div>
-                      {pt.acPowerKw !== null && pt.acPowerKw !== undefined && (
-                        <div className="flex items-center justify-between gap-4 text-sky-400">
-                          <span>AC Power:</span>
-                          <span className="font-bold">{pt.acPowerKw} kW</span>
-                        </div>
-                      )}
-                      {pt.dcPowerKw !== null && pt.dcPowerKw !== undefined && (
-                        <div className="flex items-center justify-between gap-4 text-amber-400">
-                          <span>DC Power:</span>
-                          <span className="font-bold">{pt.dcPowerKw} kW</span>
-                        </div>
+                      {isWeatherStation ? (
+                        <>
+                          {pt.irradiance !== null && pt.irradiance !== undefined && (
+                            <div className="flex items-center justify-between gap-4 text-amber-400">
+                              <span>POA Irradiance:</span>
+                              <span className="font-bold">{pt.irradiance} kW/m²</span>
+                            </div>
+                          )}
+                          {pt.ambientTemp !== null && pt.ambientTemp !== undefined && (
+                            <div className="flex items-center justify-between gap-4 text-sky-400">
+                              <span>Ambient Temp:</span>
+                              <span className="font-bold">{pt.ambientTemp} °C</span>
+                            </div>
+                          )}
+                          {pt.moduleTemp !== null && pt.moduleTemp !== undefined && (
+                            <div className="flex items-center justify-between gap-4 text-emerald-400">
+                              <span>Module Temp:</span>
+                              <span className="font-bold">{pt.moduleTemp} °C</span>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {pt.acPowerKw !== null && pt.acPowerKw !== undefined && (
+                            <div className="flex items-center justify-between gap-4 text-sky-400">
+                              <span>AC Power:</span>
+                              <span className="font-bold">{pt.acPowerKw} kW</span>
+                            </div>
+                          )}
+                          {pt.dcPowerKw !== null && pt.dcPowerKw !== undefined && (
+                            <div className="flex items-center justify-between gap-4 text-amber-400">
+                              <span>DC Power:</span>
+                              <span className="font-bold">{pt.dcPowerKw} kW</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   );
@@ -292,27 +443,66 @@ export const DeviceChart: React.FC<DeviceChartProps> = ({
               formatter={(value) => <span className="text-slate-300 font-medium">{value}</span>}
             />
 
-            <Area
-              type="monotone"
-              dataKey="acPowerKw"
-              name="AC Power (kW)"
-              stroke="#38bdf8"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#acGradient)"
-              connectNulls={false}
-            />
-
-            <Area
-              type="monotone"
-              dataKey="dcPowerKw"
-              name="DC Power (kW)"
-              stroke="#fbbf24"
-              strokeWidth={2}
-              fillOpacity={1}
-              fill="url(#dcGradient)"
-              connectNulls={false}
-            />
+            {isWeatherStation && (
+              <Area
+                type="monotone"
+                dataKey="irradiance"
+                name="POA Irrad (kW/m²)"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#irradGradient)"
+                connectNulls={true}
+              />
+            )}
+            {isWeatherStation && (
+              <Area
+                type="monotone"
+                dataKey="ambientTemp"
+                name="Ambient Temp (°C)"
+                stroke="#0ea5e9"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#ambGradient)"
+                connectNulls={true}
+              />
+            )}
+            {isWeatherStation && (
+              <Area
+                type="monotone"
+                dataKey="moduleTemp"
+                name="Module Temp (°C)"
+                stroke="#10b981"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#modGradient)"
+                connectNulls={true}
+              />
+            )}
+            {!isWeatherStation && (
+              <Area
+                type="monotone"
+                dataKey="dcPowerKw"
+                name="DC Power (kW)"
+                stroke="#fbbf24"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#dcGradient)"
+                connectNulls={true}
+              />
+            )}
+            {!isWeatherStation && (
+              <Area
+                type="monotone"
+                dataKey="acPowerKw"
+                name="AC Power (kW)"
+                stroke="#38bdf8"
+                strokeWidth={2}
+                fillOpacity={1}
+                fill="url(#acGradient)"
+                connectNulls={true}
+              />
+            )}
           </AreaChart>
         </ResponsiveContainer>
       </div>

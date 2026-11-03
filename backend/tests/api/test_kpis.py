@@ -37,6 +37,8 @@ def kpi_test_setup():
                 is_active=True,
             )
             db.add(user)
+            db.commit()
+            db.refresh(user)
 
         plant = db.query(Plant).filter(Plant.name == "KPI Test Plant", Plant.org_id == org.id).first()
         if not plant:

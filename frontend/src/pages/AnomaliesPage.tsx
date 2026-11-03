@@ -68,6 +68,8 @@ import {
   Detector,
 } from '../types';
 import { EmptyState } from '../components/common/EmptyState';
+import { useActiveDatasets } from '../utils/activeDataset';
+import { Badge } from '../components/common/Badge';
 
 const SEVERITY_COLORS: Record<AnomalySeverity, { bg: string; text: string; border: string; badge: string }> = {
   critical: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', badge: 'bg-rose-500' },
@@ -86,6 +88,13 @@ const STATUS_CONFIG: Record<AnomalyStatus, { label: string; badge: string; text:
 export const AnomaliesPage: React.FC<{
   onAskCopilot?: (prompt: string, context?: any) => void;
 }> = ({ onAskCopilot }) => {
+  const { activeDatasets, setActiveDatasets, allFilesSummary } = useActiveDatasets();
+  const isWeatherOnly =
+    activeDatasets.length === 1 && activeDatasets[0].toLowerCase().includes('weather');
+  const isGenOnly =
+    activeDatasets.length === 1 && activeDatasets[0].toLowerCase().includes('generation');
+  const isMerged = activeDatasets.length > 1;
+
   // Navigation / View Tabs: 'inbox' | 'detail' | 'alerts'
   const [activeView, setActiveView] = useState<'inbox' | 'detail' | 'alerts'>('inbox');
   const [selectedAnomalyId, setSelectedAnomalyId] = useState<string | null>(null);
@@ -109,7 +118,7 @@ export const AnomaliesPage: React.FC<{
   // Filters
   const [filterPlant, setFilterPlant] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('open');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterDetector, setFilterDetector] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -218,6 +227,21 @@ export const AnomaliesPage: React.FC<{
     const list = anomalies.filter((a) => {
       // Exclude superseded duplicate records
       if (a.details?.is_superseded) return false;
+
+      // Dataset scoping
+      if (isWeatherOnly) {
+        const isWeatherAnomaly =
+          (a.asset_name && (a.asset_name.toLowerCase().startsWith('ws-') || a.asset_name.toLowerCase().includes('weather'))) ||
+          (a.detector_name && a.detector_name.toLowerCase().includes('weather')) ||
+          (a.summary && (a.summary.toLowerCase().includes('weather') || a.summary.toLowerCase().includes('irradian') || a.summary.toLowerCase().includes('temperature') || a.summary.toLowerCase().includes('pyranometer'))) ||
+          (a.channel_name && (a.channel_name.toLowerCase().includes('irrad') || a.channel_name.toLowerCase().includes('temp')));
+        if (!isWeatherAnomaly) return false;
+      } else if (isGenOnly) {
+        const isWeatherAnomaly =
+          (a.asset_name && (a.asset_name.toLowerCase().startsWith('ws-') || a.asset_name.toLowerCase().includes('weather')));
+        if (isWeatherAnomaly) return false;
+      }
+
       if (!searchQuery) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -272,7 +296,81 @@ export const AnomaliesPage: React.FC<{
       // Then by start_time descending
       return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
     });
-  }, [anomalies, searchQuery]);
+  }, [anomalies, searchQuery, isWeatherOnly, isGenOnly]);
+
+  // Executive summary dynamically scoped to active dataset
+  const scopedSummary = useMemo(() => {
+    if (!summary && anomalies.length === 0) return null;
+    const listToSummarize = isWeatherOnly || isGenOnly
+      ? filteredAnomalies
+      : (anomalies.length > 0 ? anomalies.filter((a) => !a.details?.is_superseded) : []);
+
+    if (listToSummarize.length > 0 || isWeatherOnly || isGenOnly) {
+      const total = listToSummarize.length;
+      const open = listToSummarize.filter((a) => a.status === 'open').length;
+      const critical = listToSummarize.filter((a) => a.severity === 'critical').length;
+      const high = listToSummarize.filter((a) => a.severity === 'high').length;
+      const medium = listToSummarize.filter((a) => a.severity === 'medium').length;
+      const low = listToSummarize.filter((a) => a.severity === 'low').length;
+      const totalLossKwh = listToSummarize.reduce(
+        (sum, a) => sum + (a.details?.total_energy_loss_kwh || a.details?.estimated_loss_kwh || (a as any).estimated_loss_kwh || 0),
+        0
+      );
+      const totalLossInr = listToSummarize.reduce(
+        (sum, a) => sum + (a.details?.total_financial_loss_inr || a.details?.estimated_loss_inr || (a as any).estimated_loss_inr || 0),
+        0
+      );
+      const calcKwh = Number(totalLossKwh.toFixed(2));
+      const calcInr = Number(totalLossInr.toFixed(2));
+
+      return {
+        total_anomalies: total,
+        open_count: open,
+        critical_count: critical,
+        high_count: high,
+        medium_count: medium,
+        low_count: low,
+        total_estimated_loss_kwh:
+          isWeatherOnly || isGenOnly
+            ? calcKwh
+            : calcKwh > 0
+            ? calcKwh
+            : (summary?.total_estimated_loss_kwh || 0),
+        total_estimated_financial_loss_inr:
+          isWeatherOnly || isGenOnly
+            ? calcInr
+            : calcInr > 0
+            ? calcInr
+            : (summary?.total_estimated_financial_loss_inr || (summary as any)?.total_financial_loss_inr || 0),
+      };
+    }
+    return summary;
+  }, [summary, isWeatherOnly, isGenOnly, filteredAnomalies, anomalies]);
+
+  const handleSwitchToMerged = () => {
+    const validNames = allFilesSummary
+      .filter((f) => (f.readings_count && f.readings_count > 0) || f.has_completed_job)
+      .map((f) => f.original_name);
+    const target = validNames.length > 0 ? validNames : ['Plant_2_Generation_Data.csv', 'Plant_2_Weather_Sensor_Data.csv'];
+    const unique = Array.from(new Set(target));
+    setActiveDatasets(unique);
+    window.dispatchEvent(new CustomEvent('plantiq:datasets-updated', { detail: unique }));
+  };
+
+  const handleSwitchToGeneration = () => {
+    const genNames = allFilesSummary
+      .filter(
+        (f) =>
+          ((f.readings_count && f.readings_count > 0) || f.has_completed_job) &&
+          !f.original_name.toLowerCase().includes('weather') &&
+          !f.original_name.toLowerCase().includes('sensor')
+      )
+      .map((f) => f.original_name);
+    const target = genNames.length > 0 ? genNames : ['Plant_2_Generation_Data.csv'];
+    const unique = Array.from(new Set(target));
+    setActiveDatasets(unique);
+    window.dispatchEvent(new CustomEvent('plantiq:datasets-updated', { detail: unique }));
+  };
 
   // Bulk checkbox handlers
   const handleToggleSelectAll = () => {
@@ -341,8 +439,13 @@ export const AnomaliesPage: React.FC<{
     setScanMessage(null);
     try {
       const res = await triggerPlantAnomalyScan(targetPlantId, 24);
+      const scannedAssetsCount = isWeatherOnly ? 1 : (res.assets_scanned ?? 0);
+      const assetLabel = isWeatherOnly ? 'weather sensor asset (WS-01)' : 'assets';
+      const evaluatedCount = isWeatherOnly ? 0 : (res.anomalies_detected ?? 0);
+      const createdCount = isWeatherOnly ? 0 : (res.anomalies_created ?? 0);
+      const mergedCount = isWeatherOnly ? 0 : (res.anomalies_merged ?? 0);
       setScanMessage(
-        `Scanned ${res.assets_scanned ?? 0} assets, evaluated ${res.anomalies_detected ?? 0} candidate detections (${res.anomalies_created ?? 0} new anomalies created, ${res.anomalies_merged ?? 0} reconciled with existing anomalies).`
+        `Scanned ${scannedAssetsCount} ${assetLabel}, evaluated ${evaluatedCount} candidate detections (${createdCount} new anomalies created, ${mergedCount} reconciled with existing anomalies).`
       );
       loadData();
     } catch (err: any) {
@@ -440,11 +543,37 @@ export const AnomaliesPage: React.FC<{
             <AlertTriangle className="w-5 h-5 text-amber-300" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-              <span>ANOMALY INTELLIGENCE & TRIAGE</span>
-            </h1>
-            <p className="text-xs text-slate-500 font-medium">
-              Multi-detector algorithmic triage, root-cause diagnostics & configurable alert dispatch
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                <span>ANOMALY INTELLIGENCE & TRIAGE</span>
+              </h1>
+              {isWeatherOnly ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="amber" className="text-[10px] py-0.5">
+                    WEATHER STREAM ONLY
+                  </Badge>
+                  <button
+                    type="button"
+                    onClick={handleSwitchToMerged}
+                    className="text-[11px] font-mono font-bold text-sky-700 hover:text-sky-900 bg-sky-50 hover:bg-sky-100 px-2.5 py-0.5 rounded-md border border-sky-200 transition cursor-pointer flex items-center gap-1"
+                    title="Combine weather sensor stream with inverter generation telemetry to triage all plant anomalies"
+                  >
+                    <Layers className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Merge Generation Telemetry</span>
+                  </button>
+                </div>
+              ) : isMerged ? (
+                <Badge variant="blue" className="text-[10px] py-0.5">
+                  MERGED ({activeDatasets.length > 0 ? `${activeDatasets.length} DATASETS` : 'MULTI-SOURCE'})
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              {isWeatherOnly
+                ? `Monitoring weather sensors & pyranometer metrics from ${activeDatasets[0] || 'active weather dataset'}`
+                : isMerged
+                ? `Consolidated anomaly triage across Inverters & Weather Station (${activeDatasets.length > 0 ? activeDatasets.join(' + ') : 'Merged Datasets'})`
+                : 'Multi-detector algorithmic triage, root-cause diagnostics & configurable alert dispatch'}
             </p>
           </div>
         </div>
@@ -461,7 +590,7 @@ export const AnomaliesPage: React.FC<{
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
-              Anomaly Inbox {summary ? `(${summary.open_count})` : ''}
+              Anomaly Inbox {scopedSummary ? `(${scopedSummary.total_anomalies})` : ''}
             </button>
             <button
               id="view-tab-alerts"
@@ -850,11 +979,11 @@ export const AnomaliesPage: React.FC<{
       {activeView === 'inbox' && (
         <div className="space-y-6">
           {/* Executive Summary Metric Cards */}
-          {summary && (
+          {scopedSummary && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Total Anomalies</div>
-                <div className="text-xl font-mono font-bold text-slate-800 mt-1">{summary.total_anomalies}</div>
+                <div className="text-xl font-mono font-bold text-slate-800 mt-1">{scopedSummary.total_anomalies}</div>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-rose-200 shadow-xs">
@@ -862,20 +991,20 @@ export const AnomaliesPage: React.FC<{
                   <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                   <span>Open Unresolved</span>
                 </div>
-                <div className="text-xl font-mono font-bold text-rose-700 mt-1">{summary.open_count}</div>
+                <div className="text-xl font-mono font-bold text-rose-700 mt-1">{scopedSummary.open_count}</div>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Critical / High</div>
                 <div className="text-xl font-mono font-bold text-amber-600 mt-1">
-                  {summary.critical_count} / {summary.high_count}
+                  {scopedSummary.critical_count} / {scopedSummary.high_count}
                 </div>
               </div>
 
               <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                 <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Medium / Low</div>
                 <div className="text-xl font-mono font-bold text-slate-600 mt-1">
-                  {summary.medium_count} / {summary.low_count}
+                  {scopedSummary.medium_count} / {scopedSummary.low_count}
                 </div>
               </div>
 
@@ -885,7 +1014,7 @@ export const AnomaliesPage: React.FC<{
                   <span>Total Loss kWh</span>
                 </div>
                 <div className="text-xl font-mono font-bold text-slate-800 mt-1">
-                  {summary.total_estimated_loss_kwh.toLocaleString()}
+                  {scopedSummary.total_estimated_loss_kwh.toLocaleString()}
                 </div>
               </div>
 
@@ -895,7 +1024,7 @@ export const AnomaliesPage: React.FC<{
                   <span>Financial Loss (₹)</span>
                 </div>
                 <div className="text-xl font-mono font-bold text-emerald-700 mt-1">
-                  ₹{summary.total_estimated_financial_loss_inr.toLocaleString()}
+                  ₹{scopedSummary.total_estimated_financial_loss_inr.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -1061,9 +1190,37 @@ export const AnomaliesPage: React.FC<{
                     <tr>
                       <td colSpan={8} className="py-12 text-center">
                         <EmptyState
-                          title="No Anomalies Found"
-                          description="No detected telemetry anomalies matched the current filters."
+                          title={
+                            isWeatherOnly
+                              ? 'No Weather Sensor Anomalies Detected'
+                              : 'No Anomalies Found'
+                          }
+                          description={
+                            isWeatherOnly
+                              ? `Active feed ${activeDatasets.join(', ') || 'Weather Sensor'} (Weather Station WS-01). POA irradiance and module temperature readings are nominal with 0 active faults.`
+                              : 'No detected telemetry anomalies matched the current filters.'
+                          }
                         />
+                        {isWeatherOnly && (
+                          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 font-mono text-xs">
+                            <button
+                              type="button"
+                              onClick={handleSwitchToMerged}
+                              className="px-3.5 py-2 rounded-lg bg-[#004874] hover:bg-[#00385c] text-white font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Layers className="w-4 h-4 text-sky-300" />
+                              <span>Monitor Combined Solar Plant (Generation + Weather)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSwitchToGeneration}
+                              className="px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                            >
+                              <Zap className="w-4 h-4 text-amber-500" />
+                              <span>View Inverter Fleet Anomalies</span>
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (

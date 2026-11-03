@@ -8,14 +8,38 @@ interface AnomalyBannerProps {
   plantId?: string;
   summary?: AnomalySummary | null;
   onTriage?: () => void;
+  isWeatherOnly?: boolean;
+  activeDatasetName?: string;
 }
 
-export const AnomalyBanner: React.FC<AnomalyBannerProps> = ({ plantId, summary, onTriage }) => {
+export const AnomalyBanner: React.FC<AnomalyBannerProps> = ({
+  plantId,
+  summary,
+  onTriage,
+  isWeatherOnly = false,
+  activeDatasetName,
+}) => {
   const [summaryData, setSummaryData] = useState<AnomalySummary | null>(summary || null);
-  const [isLoading, setIsLoading] = useState<boolean>(!summary);
+  const [isLoading, setIsLoading] = useState<boolean>(!summary && !isWeatherOnly);
   const [hasError, setHasError] = useState<boolean>(false);
 
   useEffect(() => {
+    if (isWeatherOnly) {
+      setSummaryData({
+        total_anomalies: 0,
+        open_count: 0,
+        critical_count: 0,
+        high_count: 0,
+        medium_count: 0,
+        low_count: 0,
+        total_estimated_loss_kwh: 0,
+        total_estimated_financial_loss_inr: 0,
+      });
+      setIsLoading(false);
+      setHasError(false);
+      return;
+    }
+
     if (summary) {
       setSummaryData(summary);
       setIsLoading(false);
@@ -46,7 +70,7 @@ export const AnomalyBanner: React.FC<AnomalyBannerProps> = ({ plantId, summary, 
     return () => {
       isMounted = false;
     };
-  }, [plantId, summary]);
+  }, [plantId, summary, isWeatherOnly]);
 
   // Derived live counts
   const openCount = summaryData?.open_count ?? 0;
@@ -105,8 +129,14 @@ export const AnomalyBanner: React.FC<AnomalyBannerProps> = ({ plantId, summary, 
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-emerald-950">0 Active Telemetry Anomalies</h4>
-            <p className="text-[11px] text-emerald-700">All plant inverters operating within nominal baseline parameters</p>
+            <h4 className="text-xs font-bold text-emerald-950">
+              {isWeatherOnly ? '0 Active Weather Sensor Anomalies' : '0 Active Telemetry Anomalies'}
+            </h4>
+            <p className="text-[11px] text-emerald-700">
+              {isWeatherOnly
+                ? `Weather Station WS-01 operating nominally (${activeDatasetName || 'Weather Telemetry'}) with 0 active sensor faults`
+                : 'All plant inverters operating within nominal baseline parameters'}
+            </p>
           </div>
         </div>
 

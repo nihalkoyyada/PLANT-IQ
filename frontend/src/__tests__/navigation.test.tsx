@@ -35,6 +35,7 @@ vi.mock('../api/readings', () => ({
   getQCStats: vi.fn().mockResolvedValue({ total_readings: 1000, active_channels: 10 }),
   getReadingAggregate: vi.fn().mockResolvedValue([{ start: '2026-06-17T12:00:00Z', average_value: 500 }]),
   getLatestReading: vi.fn().mockResolvedValue({ ts: '2026-06-17T12:00:00Z', value: 500 }),
+  getLatestReadingsBatch: vi.fn().mockResolvedValue({ 'ch-1': { ts: '2026-06-17T12:00:00Z', value: 500 } }),
 }));
 
 vi.mock('../api/plants', () => ({
@@ -151,6 +152,21 @@ describe('Sprint 4 Dashboard Triage Navigation', () => {
     expect(screen.getByText('3 CRIT')).toBeDefined();
     expect(screen.getByText('18 H')).toBeDefined();
     expect(screen.queryByText('7 Active Telemetry Anomalies')).toBeNull();
+  });
+
+  it('renders nominal 0 anomalies in AnomalyBanner when isWeatherOnly is true', () => {
+    render(
+      <AnomalyBanner
+        isWeatherOnly={true}
+        activeDatasetName="Plant_2_Weather_Sensor_Data.csv"
+        onTriage={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('0 Active Weather Sensor Anomalies')).toBeDefined();
+    expect(screen.getByText(/Weather Station WS-01 operating nominally/i)).toBeDefined();
+    expect(screen.getByText('ALL NOMINAL')).toBeDefined();
+    expect(screen.queryByText(/Live triage required/i)).toBeNull();
   });
 
   it('navigates to "anomalies" (Anomaly Inbox) and NOT "quality" (Data Quality & QC) when Triage is clicked on Dashboard', async () => {

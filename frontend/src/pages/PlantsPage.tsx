@@ -18,12 +18,20 @@ import { getPlants } from '../api/plants';
 import { getAssets } from '../api/assets';
 import { getChannels } from '../api/channels';
 import { Asset, Channel, Plant } from '../types';
+import { useActiveDatasets } from '../utils/activeDataset';
 
 interface PlantsPageProps {
   onNavigateTab?: (tab: string) => void;
 }
 
 export const PlantsPage: React.FC<PlantsPageProps> = ({ onNavigateTab }) => {
+  const { activeDatasets } = useActiveDatasets();
+  const isWeatherOnly =
+    activeDatasets.length === 1 && activeDatasets[0].toLowerCase().includes('weather');
+  const isGenOnly =
+    activeDatasets.length === 1 && !activeDatasets[0].toLowerCase().includes('weather');
+  const isMerged = activeDatasets.length > 1;
+
   const [plants, setPlants] = useState<Plant[]>([]);
   const [selectedPlantId, setSelectedPlantId] = useState<string | null>(null);
   const [allAssets, setAllAssets] = useState<Asset[]>([]);
@@ -126,6 +134,16 @@ export const PlantsPage: React.FC<PlantsPageProps> = ({ onNavigateTab }) => {
     };
   }, [plantChannels]);
 
+  const activeInverterCount = isWeatherOnly ? 0 : inverters.length;
+  const activeChannelCount = isWeatherOnly
+    ? channelBreakdown.weatherCount
+    : isGenOnly
+    ? channelBreakdown.acPowerCount +
+      channelBreakdown.dcPowerCount +
+      channelBreakdown.dailyYieldCount +
+      channelBreakdown.totalYieldCount
+    : channelCount;
+
   const acCapacityMw = currentPlant?.capacity_ac_kw
     ? (currentPlant.capacity_ac_kw / 1000).toFixed(1)
     : '27.5';
@@ -169,12 +187,40 @@ export const PlantsPage: React.FC<PlantsPageProps> = ({ onNavigateTab }) => {
                 </h1>
               )}
 
-              <Badge variant={inverterCount > 0 ? 'emerald' : 'slate'}>
-                {inverterCount > 0 ? '● OPERATIONAL' : '● IDLE (NO INVERTERS)'}
+              <Badge
+                variant={
+                  isWeatherOnly
+                    ? 'amber'
+                    : isGenOnly
+                    ? 'blue'
+                    : inverterCount > 0
+                    ? 'emerald'
+                    : 'slate'
+                }
+              >
+                {isWeatherOnly
+                  ? '● WEATHER TELEMETRY ACTIVE (WS-01)'
+                  : isGenOnly
+                  ? `● GENERATION ACTIVE (${inverterCount} INVERTERS)`
+                  : inverterCount > 0
+                  ? `● OPERATIONAL (${inverterCount + weatherStations.length} NODES MERGED)`
+                  : '● IDLE'}
               </Badge>
               <Badge variant="navy">
                 {`${acCapacityMw} MW AC / ${dcCapacityMwp} MWp DC`}
               </Badge>
+              {activeDatasets.length > 0 && (
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700"
+                  title="Active dataset source feeding SCADA channels"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-semibold text-slate-500">FEED:</span>
+                  <span className="text-slate-800 font-medium">
+                    {activeDatasets.join(', ')}
+                  </span>
+                </div>
+              )}
             </div>
             <p className="text-xs text-slate-500 font-mono mt-1 flex items-center gap-2 flex-wrap">
               <MapPin className="w-3.5 h-3.5 text-slate-400" />
@@ -274,65 +320,132 @@ export const PlantsPage: React.FC<PlantsPageProps> = ({ onNavigateTab }) => {
             <Building2 className="w-4 h-4 text-sky-600" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-sky-800 font-mono">{inverterCount}</span>
+            <span className="text-3xl font-bold text-sky-800 font-mono">
+              {isWeatherOnly ? '1' : isGenOnly ? inverterCount : `${inverterCount + weatherStations.length}`}
+            </span>
             <span className="text-xs font-mono text-slate-500 font-bold">
-              Inverter Blocks
+              {isWeatherOnly
+                ? 'Weather Station (WS-01)'
+                : isGenOnly
+                ? 'Inverter Blocks'
+                : `SCADA Nodes (${inverterCount} Inverters${weatherStations.length > 0 ? ` + ${weatherStations.length} WS` : ''})`}
             </span>
           </div>
           <div className="text-xs text-slate-600 font-mono space-y-1.5 border-t border-slate-100 pt-3">
             <div className="flex justify-between">
               <span className="text-slate-500">Active Telemetry:</span>
-              <strong className="text-slate-800">{channelCount} Channels</strong>
+              <strong className="text-slate-800">
+                {activeChannelCount} Channels {isWeatherOnly ? '(Weather Feed)' : isGenOnly ? '(Generation Feed)' : '(Merged)'}
+              </strong>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Reference Weather System:</span>
-              <strong className="text-slate-800">{weatherStations.length} Station (WS-01)</strong>
+              <strong className="text-slate-800">
+                {weatherStations.length} Station (WS-01) {isWeatherOnly ? '• LIVE STREAM' : '• ACTIVE'}
+              </strong>
             </div>
           </div>
         </div>
       </div>
 
-      {/* SCADA Channel Architecture (91 Channels) */}
+      {/* SCADA Channel Architecture */}
       <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-[#004874]" />
             <h3 className="text-sm font-bold text-slate-800">
-              Plant SCADA Channel Architecture ({channelCount} Channels)
+              Plant SCADA Channel Architecture ({activeChannelCount} Channels {isWeatherOnly ? '• Weather Stream' : isGenOnly ? '• Generation Stream' : '• Merged Telemetry'})
             </h3>
           </div>
           <span className="text-xs font-mono text-slate-500">15-minute synchronous telemetry cadence</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200/80">
+          <div
+            className={`p-3.5 rounded-lg border transition ${
+              isWeatherOnly
+                ? 'bg-slate-50/50 border-dashed border-slate-200 opacity-60'
+                : 'bg-slate-50 border-slate-200/80'
+            }`}
+          >
             <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">AC Power Channels</div>
-            <div className="text-lg font-mono font-bold text-slate-900 mt-1">{channelBreakdown.acPowerCount} Channels</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">kW Active Generation</div>
+            <div className="text-lg font-mono font-bold text-slate-900 mt-1">
+              {isWeatherOnly ? '0' : channelBreakdown.acPowerCount} Channels
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              {isWeatherOnly ? '22 Inverters (Awaiting Feed)' : 'kW Active Generation'}
+            </div>
           </div>
 
-          <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200/80">
+          <div
+            className={`p-3.5 rounded-lg border transition ${
+              isWeatherOnly
+                ? 'bg-slate-50/50 border-dashed border-slate-200 opacity-60'
+                : 'bg-slate-50 border-slate-200/80'
+            }`}
+          >
             <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">DC Power Channels</div>
-            <div className="text-lg font-mono font-bold text-slate-900 mt-1">{channelBreakdown.dcPowerCount} Channels</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">kW String Input</div>
+            <div className="text-lg font-mono font-bold text-slate-900 mt-1">
+              {isWeatherOnly ? '0' : channelBreakdown.dcPowerCount} Channels
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              {isWeatherOnly ? '22 Inverters (Awaiting Feed)' : 'kW String Input'}
+            </div>
           </div>
 
-          <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200/80">
+          <div
+            className={`p-3.5 rounded-lg border transition ${
+              isWeatherOnly
+                ? 'bg-slate-50/50 border-dashed border-slate-200 opacity-60'
+                : 'bg-slate-50 border-slate-200/80'
+            }`}
+          >
             <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Daily Yield Channels</div>
-            <div className="text-lg font-mono font-bold text-slate-900 mt-1">{channelBreakdown.dailyYieldCount} Channels</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">kWh Daily Integrals</div>
+            <div className="text-lg font-mono font-bold text-slate-900 mt-1">
+              {isWeatherOnly ? '0' : channelBreakdown.dailyYieldCount} Channels
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              {isWeatherOnly ? '22 Inverters (Awaiting Feed)' : 'kWh Daily Integrals'}
+            </div>
           </div>
 
-          <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200/80">
+          <div
+            className={`p-3.5 rounded-lg border transition ${
+              isWeatherOnly
+                ? 'bg-slate-50/50 border-dashed border-slate-200 opacity-60'
+                : 'bg-slate-50 border-slate-200/80'
+            }`}
+          >
             <div className="text-[10px] font-mono uppercase text-slate-400 font-bold">Total Yield Channels</div>
-            <div className="text-lg font-mono font-bold text-slate-900 mt-1">{channelBreakdown.totalYieldCount} Channels</div>
-            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">kWh Cumulative Metered</div>
+            <div className="text-lg font-mono font-bold text-slate-900 mt-1">
+              {isWeatherOnly ? '0' : channelBreakdown.totalYieldCount} Channels
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              {isWeatherOnly ? '22 Inverters (Awaiting Feed)' : 'kWh Cumulative Metered'}
+            </div>
           </div>
 
-          <div className="bg-amber-50/60 p-3.5 rounded-lg border border-amber-200/80">
-            <div className="text-[10px] font-mono uppercase text-amber-700 font-bold">Meteorological Sensors</div>
-            <div className="text-lg font-mono font-bold text-amber-900 mt-1">{channelBreakdown.weatherCount} Sensors</div>
-            <div className="text-[11px] text-amber-700 mt-0.5 font-medium">POA Irradiance & Temperatures</div>
+          <div
+            className={`p-3.5 rounded-lg border transition ${
+              isWeatherOnly
+                ? 'bg-amber-50/80 border-amber-300 ring-1 ring-amber-300/50 shadow-2xs'
+                : 'bg-amber-50/60 border-amber-200/80'
+            }`}
+          >
+            <div className="text-[10px] font-mono uppercase text-amber-700 font-bold flex items-center justify-between">
+              <span>Meteorological Sensors</span>
+              {isWeatherOnly && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-200/70 text-amber-900 font-bold">
+                  ACTIVE FEED
+                </span>
+              )}
+            </div>
+            <div className="text-lg font-mono font-bold text-amber-900 mt-1">
+              {channelBreakdown.weatherCount} Sensors
+            </div>
+            <div className="text-[11px] text-amber-700 mt-0.5 font-medium">
+              POA Irradiance &amp; Temperatures
+            </div>
           </div>
         </div>
       </div>

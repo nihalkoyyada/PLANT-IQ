@@ -25,7 +25,6 @@ import {
   Sun,
   Layers,
   Trash2,
-  Sparkles,
 } from 'lucide-react';
 
 import { Badge } from '../components/common/Badge';
@@ -35,6 +34,7 @@ import { getAssets } from '../api/assets';
 import { getPlants } from '../api/plants';
 import { getReadingAggregate } from '../api/readings';
 import { Channel, Asset, Plant, ReadingAggregate } from '../types';
+import { useActiveDatasets } from '../utils/activeDataset';
 
 /* =========================================================
  * COLOR PALETTE & HELPER FUNCTIONS
@@ -57,6 +57,18 @@ const getHumanMetricName = (canonicalKey: string, sourceName: string): string =>
   const key = (canonicalKey || '').toLowerCase();
   const src = (sourceName || '').toUpperCase();
 
+  if (key === 'irradiance_poa' || key === 'irradiance' || src.includes('IRRADIANCE')) {
+    return 'POA Irradiance';
+  }
+  if (key === 'temperature_ambient' || src.includes('AMBIENT')) {
+    return 'Ambient Temp';
+  }
+  if (key === 'temperature_module' || src.includes('MODULE')) {
+    return 'Module Temp';
+  }
+  if (key.includes('temp') || src.includes('TEMP')) {
+    return 'Temperature';
+  }
   if (key === 'power_ac' || src.includes('AC_POWER') || src.includes('AC POWER')) {
     return 'AC Power';
   }
@@ -78,12 +90,6 @@ const getHumanMetricName = (canonicalKey: string, sourceName: string): string =>
     src.includes('TOTAL YIELD')
   ) {
     return 'Total Energy';
-  }
-  if (key === 'irradiance' || src.includes('IRRADIANCE')) {
-    return 'Irradiance';
-  }
-  if (key.includes('temp') || src.includes('TEMP')) {
-    return 'Temperature';
   }
 
   const raw = canonicalKey || sourceName || 'Signal';
@@ -107,6 +113,7 @@ const getAssetNameForChannel = (channel: Channel, assetsList: Asset[]): string =
 export const TelemetryPage: React.FC<{
   onAskCopilot?: (prompt: string, context?: any) => void;
 }> = ({ onAskCopilot }) => {
+  const { activeDatasets } = useActiveDatasets();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -132,6 +139,21 @@ export const TelemetryPage: React.FC<{
   const [activeTableChannelId, setActiveTableChannelId] = useState<string>('');
 
   /*
+   * Scope detection based on selected datasets
+   */
+  const isWeatherOnly = useMemo(() => {
+    return activeDatasets.length === 1 && activeDatasets[0].toLowerCase().includes('weather');
+  }, [activeDatasets]);
+
+  const isGenerationOnly = useMemo(() => {
+    return activeDatasets.length === 1 && !activeDatasets[0].toLowerCase().includes('weather');
+  }, [activeDatasets]);
+
+  const isMerged = useMemo(() => {
+    return activeDatasets.length > 1 || activeDatasets.length === 0;
+  }, [activeDatasets]);
+
+  /*
    * Fetch initial structure: Plants, Assets, Channels
    */
   useEffect(() => {
@@ -147,20 +169,6 @@ export const TelemetryPage: React.FC<{
         setPlants(plantsList);
         setChannels(chans);
         setAssets(asts);
-
-        // Select first 2 power channels by default if available
-        if (chans.length > 0) {
-          const powerChans = chans.filter(
-            (c) => c.canonical_key === 'power_ac' || c.canonical_key === 'power_dc'
-          );
-          if (powerChans.length >= 2) {
-            setSelectedChannelIds([powerChans[0].id, powerChans[1].id]);
-          } else {
-            setSelectedChannelIds([chans[0].id]);
-          }
-        } else {
-          setSelectedChannelIds([]);
-        }
       } catch (err) {
         console.error('Failed to fetch initial telemetry structure:', err);
         setPlants([]);
@@ -175,6 +183,113 @@ export const TelemetryPage: React.FC<{
 
     fetchInitialData();
   }, []);
+
+  /*
+   * Dynamically filter assets and channels based on active dataset selection
+   */
+  const filteredAssets = useMemo(() => {
+    if (isWeatherOnly) {
+      return assets.filter(
+        (a) =>
+          a.asset_type === 'weather_station' ||
+          a.name === 'WS-01' ||
+          a.name.toLowerCase().includes('weather')
+      );
+    }
+    if (isGenerationOnly) {
+      return assets.filter(
+        (a) =>
+          a.asset_type !== 'weather_station' &&
+          a.name !== 'WS-01' &&
+          !a.name.toLowerCase().includes('weather')
+      );
+    }
+    // Merged: WS-01 sorted first, followed by inverters
+    return [...assets].sort((a, b) => {
+      if (a.name === 'WS-01' || a.asset_type === 'weather_station') return -1;
+      if (b.name === 'WS-01' || b.asset_type === 'weather_station') return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [assets, isWeatherOnly, isGenerationOnly]);
+
+  const filteredChannels = useMemo(() => {
+    if (isWeatherOnly) {
+      return channels.filter((c) => {
+        const isWeatherKey =
+          ['irradiance_poa', 'temperature_ambient', 'temperature_module'].includes(c.canonical_key) ||
+          c.source_name.toLowerCase().includes('irradiance') ||
+          c.source_name.toLowerCase().includes('temp');
+        const parentAsset = assets.find((a) => a.id === c.asset_id);
+        const isWeatherAsset =
+          parentAsset?.name === 'WS-01' || parentAsset?.asset_type === 'weather_station';
+        return isWeatherKey || isWeatherAsset;
+      });
+    }
+    if (isGenerationOnly) {
+      return channels.filter((c) => {
+        const parentAsset = assets.find((a) => a.id === c.asset_id);
+        const isWeatherAsset =
+          parentAsset?.name === 'WS-01' || parentAsset?.asset_type === 'weather_station';
+        const isWeatherKey =
+          ['irradiance_poa', 'temperature_ambient', 'temperature_module'].includes(c.canonical_key);
+        return !isWeatherAsset && !isWeatherKey;
+      });
+    }
+    return channels;
+  }, [channels, assets, isWeatherOnly, isGenerationOnly]);
+
+  /*
+   * Synchronize default channel selection when datasets or channels change
+   */
+  useEffect(() => {
+    if (filteredChannels.length === 0) {
+      setSelectedChannelIds([]);
+      return;
+    }
+
+    // Check if currently selected channels are still valid within filteredChannels
+    const validSelected = selectedChannelIds.filter((id) =>
+      filteredChannels.some((c) => c.id === id)
+    );
+
+    if (validSelected.length > 0) {
+      if (validSelected.length !== selectedChannelIds.length) {
+        setSelectedChannelIds(validSelected);
+      }
+      return;
+    }
+
+    // Auto-select smart defaults based on active stream
+    if (isWeatherOnly) {
+      const irr = filteredChannels.find((c) => c.canonical_key === 'irradiance_poa');
+      const amb = filteredChannels.find((c) => c.canonical_key === 'temperature_ambient');
+      const defaults = [irr?.id, amb?.id].filter(Boolean) as string[];
+      if (defaults.length > 0) {
+        setSelectedChannelIds(defaults);
+      } else {
+        setSelectedChannelIds(filteredChannels.slice(0, 2).map((c) => c.id));
+      }
+    } else if (isGenerationOnly) {
+      const powerChans = filteredChannels.filter(
+        (c) => c.canonical_key === 'power_ac' || c.canonical_key === 'power_dc'
+      );
+      if (powerChans.length >= 2) {
+        setSelectedChannelIds([powerChans[0].id, powerChans[1].id]);
+      } else {
+        setSelectedChannelIds(filteredChannels.slice(0, 2).map((c) => c.id));
+      }
+    } else {
+      // Merged: Select Inverter 01 AC Power and WS-01 POA Irradiance for correlation
+      const inv01Power = filteredChannels.find((c) => c.canonical_key === 'power_ac');
+      const wsIrradiance = filteredChannels.find((c) => c.canonical_key === 'irradiance_poa');
+      const defaults = [inv01Power?.id, wsIrradiance?.id].filter(Boolean) as string[];
+      if (defaults.length >= 2) {
+        setSelectedChannelIds(defaults);
+      } else {
+        setSelectedChannelIds(filteredChannels.slice(0, 2).map((c) => c.id));
+      }
+    }
+  }, [filteredChannels, isWeatherOnly, isGenerationOnly]);
 
   /*
    * Map channels to detailed metadata for labels, units, and legend formatting
@@ -194,10 +309,15 @@ export const TelemetryPage: React.FC<{
       }
     > = {};
 
-    channels.forEach((ch, idx) => {
+    filteredChannels.forEach((ch, idx) => {
       const assetName = getAssetNameForChannel(ch, assets);
       const metricName = getHumanMetricName(ch.canonical_key, ch.source_name);
-      const defaultUnit = metricName.includes('Energy') ? 'kWh' : 'kW';
+      let defaultUnit = metricName.includes('Energy') ? 'kWh' : 'kW';
+      if (metricName.includes('Irradiance') || ch.canonical_key === 'irradiance_poa') {
+        defaultUnit = 'kW/m²';
+      } else if (metricName.includes('Temp') || ch.canonical_key.includes('temperature')) {
+        defaultUnit = '°C';
+      }
       const unit = ch.receive_unit || defaultUnit;
 
       map[ch.id] = {
@@ -213,7 +333,7 @@ export const TelemetryPage: React.FC<{
     });
 
     return map;
-  }, [channels, assets]);
+  }, [filteredChannels, assets]);
 
   /*
    * List of currently selected channel objects
@@ -405,6 +525,8 @@ export const TelemetryPage: React.FC<{
     }
 
     // Build CSV Headers: Timestamp, Inverter 01 — AC Power (kW), Inverter 01 — DC Power (kW)...
+    const activeSourcesInfo = activeDatasets.length > 0 ? activeDatasets.join('; ') : 'Surya-A-demo.csv';
+    const metadataComment = `# PlantIQ Telemetry Export - Active Datasets: ${activeSourcesInfo}\n# Date Range: ${appliedRange.start} to ${appliedRange.end}\n`;
     const headers = [
       'Timestamp',
       ...selectedChannelsInfo.map((info) => `"${info.displayName} (${info.unit})"`),
@@ -419,7 +541,7 @@ export const TelemetryPage: React.FC<{
       return [tsFormatted, ...values].join(',');
     });
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    const csvContent = metadataComment + [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -440,7 +562,15 @@ export const TelemetryPage: React.FC<{
     const units = new Set(selectedChannelsInfo.map((i) => i.unit));
     if (units.size === 1) {
       const unit = Array.from(units)[0];
-      return unit === 'kW' ? 'Power (kW)' : unit === 'kWh' ? 'Energy (kWh)' : `Value (${unit})`;
+      return unit === 'kW'
+        ? 'Power (kW)'
+        : unit === 'kWh'
+        ? 'Energy (kWh)'
+        : unit === 'kW/m²'
+        ? 'POA Irradiance (kW/m²)'
+        : unit === '°C'
+        ? 'Temperature (°C)'
+        : `Value (${unit})`;
     }
     return 'Value';
   }, [selectedChannelsInfo]);
@@ -466,13 +596,33 @@ export const TelemetryPage: React.FC<{
       <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight font-sans">
                 Telemetry Analytics Explorer
               </h1>
+              {isWeatherOnly ? (
+                <Badge variant="amber">WEATHER STREAM (WS-01)</Badge>
+              ) : isGenerationOnly ? (
+                <Badge variant="blue">GENERATION STREAM</Badge>
+              ) : (
+                <Badge variant="emerald">
+                  MERGED ({activeDatasets.length > 0 ? `${activeDatasets.length} DATASETS` : 'MULTI-DATASET'})
+                </Badge>
+              )}
               <Badge variant={selectedChannelIds.length > 0 ? 'emerald' : 'slate'}>
                 {selectedChannelIds.length > 0 ? `${selectedChannelIds.length} ACTIVE CHANNELS` : 'NO SELECTION'}
               </Badge>
+              <div
+                id="telemetry-active-datasets-pill"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700"
+                title="Active dataset source feeding telemetry readings"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-semibold text-slate-500">FEED:</span>
+                <span className="text-slate-800 font-medium">
+                  {activeDatasets.length > 0 ? activeDatasets.join(', ') : 'Surya-A-demo.csv'}
+                </span>
+              </div>
             </div>
             <p className="text-xs text-slate-500 font-mono mt-0.5">
               Multi-channel time series telemetry curves with timestamp alignment
@@ -506,34 +656,6 @@ export const TelemetryPage: React.FC<{
               <Download className="w-3.5 h-3.5" />
               <span>EXPORT CSV</span>
             </button>
-
-            {/* Contextual Ask Copilot Action Button */}
-            {onAskCopilot && (
-              <button
-                id="btn-telemetry-ask-copilot"
-                onClick={() => {
-                  const selectedChannels = channels.filter((c) => selectedChannelIds.includes(c.id));
-                  const signalNames = selectedChannels.map((c) =>
-                    getHumanMetricName(c.canonical_key, c.source_name)
-                  );
-                  const signalsLabel =
-                    signalNames.length > 0 ? signalNames.join(', ') : 'AC Power & POA Irradiance';
-                  onAskCopilot(
-                    `Explain the selected telemetry trends for ${signalsLabel} from ${appliedRange.start} to ${appliedRange.end} and identify any unusual spikes, tripping, or degradation.`,
-                    {
-                      route: 'telemetry',
-                      selectedSignals: signalNames.length > 0 ? signalNames : ['power_ac'],
-                      dateRange: `${appliedRange.start} to ${appliedRange.end}`,
-                    }
-                  );
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition shadow-xs"
-                title="Analyze Selected Telemetry with Solar Copilot"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>ASK COPILOT</span>
-              </button>
-            )}
           </div>
         </div>
 
@@ -609,8 +731,8 @@ export const TelemetryPage: React.FC<{
         <div className="lg:col-span-4 xl:col-span-3">
           <AssetTree
             plants={plants}
-            assets={assets}
-            channels={channels}
+            assets={filteredAssets}
+            channels={filteredChannels}
             selectedChannelIds={selectedChannelIds}
             onToggleChannel={handleToggleChannel}
             onSelectChannels={handleSelectChannels}

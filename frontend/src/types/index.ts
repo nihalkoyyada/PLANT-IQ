@@ -123,10 +123,14 @@ export interface AITimestampProfile {
 }
 
 export interface AIMappingSuggestion {
-  raw_column: string;
-  canonical_key: string;
-  confidence: number;
+  raw_column?: string;
+  raw_header?: string;
+  canonical_key?: string;
+  suggested_canonical_key?: string;
+  confidence?: number;
+  confidence_score?: number;
   reason?: string;
+  reasoning?: string;
 }
 
 export interface AIProfileResponse {

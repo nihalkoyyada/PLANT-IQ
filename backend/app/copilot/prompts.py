@@ -78,21 +78,11 @@ def build_copilot_system_prompt(
     expected_pr: Optional[float] = None,
     current_time: Optional[datetime] = None,
 ) -> str:
-    """Construct dynamic system prompt with localized plant metadata and clock grounding."""
-    now_utc = current_time or datetime.now(timezone.utc)
+    """Construct dynamic system prompt with localized plant metadata and static grounding for prompt caching."""
     tz_str = timezone_name or "Asia/Kolkata"
-
-    try:
-        plant_tz = ZoneInfo(tz_str)
-        local_now = now_utc.astimezone(plant_tz)
-        local_time_str = local_now.strftime("%Y-%m-%d %H:%M:%S %Z")
-    except Exception:
-        local_time_str = now_utc.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     context_lines = [
         "### CURRENT OPERATIONAL CONTEXT:",
-        f"- Server UTC Time: {now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}",
-        f"- Plant Local Time: {local_time_str}",
         f"- Plant Timezone: {tz_str}",
     ]
 

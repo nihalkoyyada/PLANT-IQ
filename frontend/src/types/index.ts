@@ -149,10 +149,49 @@ export interface AIProfileResponse {
 export interface User {
   id: string;
   org_id: string;
+  org_name?: string | null;
   email: string;
   full_name: string;
-  role: 'admin' | 'engineer' | 'viewer' | string;
+  role: 'super_admin' | 'admin' | 'engineer' | 'viewer' | string;
   is_active: boolean;
+  created_at?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  user_id: string | null;
+  user_email?: string | null;
+  user_name?: string | null;
+  org_id?: string | null;
+  action: string;
+  entity: string;
+  entity_id?: string | null;
+  details: Record<string, any>;
+  created_at: string;
+}
+
+export interface AuditLogListResponse {
+  items: AuditLog[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminUserListResponse {
+  items: User[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminSummaryResponse {
+  role: string;
+  is_super_admin: boolean;
+  total_users: number;
+  total_detectors: number;
+  total_alert_rules: number;
+  total_audit_logs: number;
+  total_organizations?: number | null;
 }
 
 export interface TokenResponse {
@@ -472,3 +511,160 @@ export interface AlertDelivery {
   created_at: string;
 }
 
+
+// =====================================================================
+// PLATFORM SUPER ADMIN TYPES
+// =====================================================================
+
+export interface PlatformOrgAdminSummary {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+}
+
+export interface PlatformOrgListItem {
+  id: string;
+  name: string;
+  status: 'active' | 'suspended';
+  created_at: string;
+  updated_at: string;
+  admin_user?: PlatformOrgAdminSummary | null;
+  user_count: number;
+  plant_count: number;
+  device_count: number;
+  last_activity?: string | null;
+}
+
+export interface PlatformOrgListResponse {
+  total: number;
+  items: PlatformOrgListItem[];
+}
+
+export interface PlatformUserListItem {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+  org_id: string;
+  org_name: string;
+  created_at: string;
+}
+
+export interface PlatformUserListResponse {
+  total: number;
+  items: PlatformUserListItem[];
+}
+
+export interface SystemServiceHealth {
+  status: string;
+  latency_ms?: number | null;
+  details?: string | null;
+}
+
+export interface PlatformOverviewResponse {
+  total_organizations: number;
+  active_organizations: number;
+  suspended_organizations: number;
+  total_users: number;
+  total_plants: number;
+  total_devices: number;
+  total_readings: number;
+  ingestion_health: {
+    total_jobs: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    active_streams: number;
+    recent_jobs?: Array<{
+      id: string;
+      status: string;
+      filename: string;
+      org_name?: string | null;
+      rows_total: number;
+      readings_inserted: number;
+      channels_created?: number;
+      error?: string | null;
+      created_at?: string | null;
+      finished_at?: string | null;
+    }>;
+  };
+  system_health: Record<string, SystemServiceHealth>;
+  recent_activity: Array<{
+    id: string;
+    action: string;
+    entity: string;
+    actor: string;
+    actor_email?: string | null;
+    time: string;
+  }>;
+}
+
+export interface PlatformPlantListItem {
+  id: string;
+  name: string;
+  org_id: string;
+  org_name: string;
+  plant_type: string;
+  capacity_mw: number;
+  device_count: number;
+  created_at: string;
+}
+
+export interface PlatformPlantsResponse {
+  total_plants: number;
+  total_capacity_mw: number;
+  solar_capacity_mw: number;
+  wind_capacity_mw: number;
+  total_devices: number;
+  items: PlatformPlantListItem[];
+}
+
+export interface PlatformMonitoringResponse {
+  api: SystemServiceHealth;
+  database: SystemServiceHealth;
+  redis: SystemServiceHealth;
+  celery: SystemServiceHealth;
+  ingestion_pipeline: {
+    total_files: number;
+    recent_jobs: Array<{ id: string; status: string; file_id: string }>;
+    failed_jobs_count: number;
+    failed_jobs: Array<{ id: string; status: string; file_id: string }>;
+  };
+  organization_health: Array<{
+    id: string;
+    name: string;
+    status: string;
+    total_files: number;
+  }>;
+}
+
+export interface PlatformAuditLogItem {
+  id: string;
+  user_id?: string | null;
+  actor_email?: string | null;
+  actor_name?: string | null;
+  org_id?: string | null;
+  org_name?: string | null;
+  action: string;
+  entity: string;
+  entity_id?: string | null;
+  details: Record<string, any>;
+  created_at: string;
+}
+
+export interface PlatformAuditLogResponse {
+  total: number;
+  items: PlatformAuditLogItem[];
+}
+
+export interface PlatformSettingsResponse {
+  platform_name: string;
+  maintenance_mode: boolean;
+  telemetry_retention_days: number;
+  session_timeout_minutes: number;
+  version: string;
+  updated_at?: string | null;
+}

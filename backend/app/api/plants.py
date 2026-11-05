@@ -77,11 +77,10 @@ def get_plants(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = db.execute(
-        select(Plant)
-        .where(Plant.org_id == current_user.org_id)
-        .order_by(Plant.created_at.desc())
-    )
+    query = select(Plant).order_by(Plant.created_at.desc())
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
+    result = db.execute(query)
     return result.scalars().all()
 
 

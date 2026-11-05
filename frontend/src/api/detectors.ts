@@ -29,3 +29,13 @@ export const updateDetector = async (
 export const deleteDetector = async (detectorId: string): Promise<void> => {
   await apiClient.delete(`/detectors/${detectorId}`);
 };
+
+export const runDetector = async (
+  detectorId: string,
+  params?: { window_hours?: number; dry_run?: boolean }
+): Promise<any> => {
+  const response = await apiClient.post(`/detectors/${detectorId}/run`, undefined, {
+    params,
+  });
+  return response.data;
+};

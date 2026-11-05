@@ -21,12 +21,19 @@ export const DashboardPage: React.FC<{
 }> = ({ onNavigateTab, onAskCopilot }) => {
   const {
     activeDatasets,
+    activeSources,
+    allFilesSummary,
     hasWeather,
     hasGeneration,
     isWeatherOnly,
     isGenOnly,
     isMerged,
+    refreshActiveDatasets,
   } = useActiveDatasets();
+
+  useEffect(() => {
+    refreshActiveDatasets?.(true);
+  }, [refreshActiveDatasets]);
 
   const [plant, setPlant] = useState<Plant | null>(null);
   const [inverterCount, setInverterCount] = useState<number>(0);
@@ -345,8 +352,11 @@ export const DashboardPage: React.FC<{
           <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mt-1 flex-wrap">
             <Calendar className="w-3.5 h-3.5 text-sky-600" />
             <span className="text-slate-600 font-semibold">Active Ingest Stream:</span>
-            {hasTelemetry && activeDatasets.length > 0 ? (
-              activeDatasets.map((ds) => (
+            {hasTelemetry && (activeDatasets.length > 0 || activeSources.length > 0 || allFilesSummary.length > 0) ? (
+              (activeDatasets.length > 0
+                ? activeDatasets
+                : [activeSources[0]?.original_name || allFilesSummary[0]?.original_name || 'Plant_1_Generation_Data.csv']
+              ).map((ds) => (
                 <Badge
                   key={ds}
                   variant={ds.toLowerCase().includes('weather') ? 'amber' : 'blue'}
@@ -355,10 +365,6 @@ export const DashboardPage: React.FC<{
                   📁 {ds}
                 </Badge>
               ))
-            ) : hasTelemetry ? (
-              <Badge variant="blue" className="font-mono text-[10px] py-0.5">
-                📁 Surya-A-demo.csv
-              </Badge>
             ) : (
               <span>No dataset active</span>
             )}

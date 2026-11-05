@@ -52,11 +52,21 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
     }
 
     loadQCStats();
+
+    const handleUpdate = () => {
+      loadQCStats();
+    };
+    window.addEventListener('plantiq:datasets-updated', handleUpdate);
+    window.addEventListener('plantiq:ingested', handleUpdate);
+    return () => {
+      window.removeEventListener('plantiq:datasets-updated', handleUpdate);
+      window.removeEventListener('plantiq:ingested', handleUpdate);
+    };
   }, []);
 
   const scopedReadings = useMemo<number>(() => {
     if (activeDatasets.length === 0) {
-      return qcData?.total_readings || 0;
+      return 0;
     }
     if (sources.length > 0) {
       if (isWeatherOnly) {
@@ -65,7 +75,7 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
             s.original_name.toLowerCase().includes('weather') && (s.readings_count || 0) > 0
         );
         if (weatherSource && weatherSource.readings_count > 0) return weatherSource.readings_count;
-        return 9777;
+        return qcData?.total_readings || 0;
       }
       if (isGenOnly) {
         const genSource =
@@ -80,7 +90,7 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
               !s.original_name.toLowerCase().includes('weather') && (s.readings_count || 0) > 0
           );
         if (genSource && genSource.readings_count > 0) return genSource.readings_count;
-        return 275112;
+        return qcData?.total_readings || 0;
       }
       // Merged or multiple datasets active
       const activeSources = sources.filter((s: ActiveTelemetrySourceItem) =>
@@ -95,12 +105,12 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
         if (sum > 0) return sum;
       }
     }
-    return isWeatherOnly ? 9777 : isGenOnly ? 275112 : (qcData?.total_readings || 555690);
+    return qcData?.total_readings || 0;
   }, [sources, activeDatasets, isWeatherOnly, isGenOnly, qcData]);
 
   const scopedChannels = useMemo<number>(() => {
     if (activeDatasets.length === 0) {
-      return qcData?.active_channels || 0;
+      return 0;
     }
     if (sources.length > 0) {
       if (isWeatherOnly) {
@@ -109,7 +119,7 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
             s.original_name.toLowerCase().includes('weather') && (s.channels_count || 0) > 0
         );
         if (weatherSource?.channels_count) return weatherSource.channels_count;
-        return 3;
+        return qcData?.active_channels || 0;
       }
       if (isGenOnly) {
         const genSource =
@@ -124,7 +134,7 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
               !s.original_name.toLowerCase().includes('weather') && (s.channels_count || 0) > 0
           );
         if (genSource?.channels_count) return genSource.channels_count;
-        return 88;
+        return qcData?.active_channels || 0;
       }
       // Merged or multiple datasets active
       const activeSources = sources.filter((s: ActiveTelemetrySourceItem) =>
@@ -139,7 +149,7 @@ export const DataQualityPage: React.FC = (): React.ReactElement => {
         if (sum > 0) return sum;
       }
     }
-    return isWeatherOnly ? 3 : isGenOnly ? 88 : (qcData?.active_channels || 182);
+    return qcData?.active_channels || 0;
   }, [sources, activeDatasets, isWeatherOnly, isGenOnly, qcData]);
 
   const { nodeCount, inverterCount, wsCount } = useMemo<{

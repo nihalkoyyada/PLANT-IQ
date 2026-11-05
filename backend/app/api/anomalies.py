@@ -89,8 +89,9 @@ def get_anomalies(
     query = (
         select(Anomaly)
         .join(Plant, Anomaly.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
     )
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
 
     if plant_id is not None:
         plant = db.get(Plant, plant_id)
@@ -155,8 +156,9 @@ def get_anomalies_summary(
     query = (
         select(Anomaly)
         .join(Plant, Anomaly.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
     )
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
 
     if plant_id is not None:
         plant = db.get(Plant, plant_id)
@@ -225,7 +227,7 @@ def get_anomalies_summary(
 def bulk_triage_anomalies(
     payload: BulkAnomalyTriageRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "engineer", "viewer")),
+    current_user: User = Depends(require_role("admin", "engineer")),
 ):
     """Execute bulk triage actions across selected anomalies with transactional audit logging."""
     if not payload.anomaly_ids:
@@ -301,7 +303,7 @@ def triage_anomaly(
     anomaly_id: UUID,
     update_data: AnomalyUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "engineer", "viewer")),
+    current_user: User = Depends(require_role("admin", "engineer")),
 ):
     """Triage and update status of a detected anomaly with audit record tracking."""
     anomaly = db.get(Anomaly, anomaly_id)

@@ -20,6 +20,8 @@ from app.api.anomalies import router as anomalies_router
 from app.api.alert_rules import router as alert_rules_router
 from app.api.copilot import router as copilot_router
 from app.api.dev import router as dev_router
+from app.api.admin import router as admin_router
+from app.api.platform import router as platform_router
 from app.core.config import settings
 from app.db.session import create_db_engine, get_session_factory
 from app.models import Asset
@@ -38,12 +40,7 @@ async def lifespan(app: FastAPI):
                 from scripts.seed_surya import seed_surya_data
                 seed_surya_data(session=session, reset=False)
 
-        # Ensure POA irradiance baseline telemetry is attached for solar PR calculations
-        try:
-            from scripts.remediate_poa_data import remediate_poa_data
-            remediate_poa_data()
-        except Exception as poa_err:
-            print(f"Note: POA baseline remediation on startup check: {poa_err}")
+
     except Exception as err:
         print(f"Warning: Baseline organization/user seeding on startup encountered note: {err}")
     yield
@@ -85,6 +82,8 @@ app.include_router(kpis_router)
 app.include_router(ai_router)
 app.include_router(copilot_router)
 app.include_router(dev_router)
+app.include_router(admin_router)
+app.include_router(platform_router)
 
 
 @app.get("/health")

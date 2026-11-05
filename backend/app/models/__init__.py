@@ -25,6 +25,8 @@ from app.models.entities import (
     Reading,
     ToolCallRecord,
     User,
+    PlatformSetting,
+    UserInvitation,
 )
 
 __all__ = [

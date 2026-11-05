@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
-    ALLOW_SELF_REGISTRATION_ROLE_SELECTION: bool = True
+    ALLOW_SELF_REGISTRATION_ROLE_SELECTION: bool = False
 
     # Email Delivery Configuration (Resend API & Transactional Sending)
     EMAIL_PROVIDER: str = "resend"

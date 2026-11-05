@@ -47,11 +47,9 @@ def get_alert_rules(
     current_user: User = Depends(get_current_user),
 ):
     """List alert rules scoped to the authenticated user's organization."""
-    query = (
-        select(AlertRule)
-        .join(Plant, AlertRule.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-    )
+    query = select(AlertRule).join(Plant, AlertRule.plant_id == Plant.id)
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
 
     if plant_id is not None:
         plant = db.get(Plant, plant_id)
@@ -81,7 +79,7 @@ def get_alert_deliveries(
     query = (
         select(AlertDelivery)
         .join(Plant, AlertDelivery.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
+        
     )
 
     if plant_id is not None:

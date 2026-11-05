@@ -81,6 +81,16 @@ class Organization(Base):
         String,
         nullable=False,
     )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default="active",
+        default="active",
+    )
+    details: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -95,6 +105,9 @@ class Organization(Base):
 
     users: Mapped[List["User"]] = relationship(
         "User", back_populates="organization", cascade="all, delete-orphan"
+    )
+    invitations: Mapped[List["UserInvitation"]] = relationship(
+        "UserInvitation", back_populates="organization", cascade="all, delete-orphan"
     )
     plants: Mapped[List["Plant"]] = relationship(
         "Plant", back_populates="organization", cascade="all, delete-orphan"
@@ -135,10 +148,10 @@ class User(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
-    org_id: Mapped[UUID] = mapped_column(
+    org_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     email: Mapped[str] = mapped_column(
         Text,
@@ -168,7 +181,10 @@ class User(Base):
         server_default=func.now(),
     )
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="users")
+    sent_invitations: Mapped[List["UserInvitation"]] = relationship(
+        "UserInvitation", back_populates="invited_by", foreign_keys="UserInvitation.invited_by_user_id"
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         if "organization_id" in kwargs:
@@ -181,11 +197,11 @@ class User(Base):
         super().__init__(**kwargs)
 
     @property
-    def organization_id(self) -> UUID:
+    def organization_id(self) -> Optional[UUID]:
         return self.org_id
 
     @organization_id.setter
-    def organization_id(self, value: UUID) -> None:
+    def organization_id(self, value: Optional[UUID]) -> None:
         self.org_id = value
 
     @property
@@ -210,6 +226,72 @@ class User(Base):
             name="ck_users_role",
         ),
     )
+
+
+class UserInvitation(Base):
+    """Pending or accepted user invitation for controlled onboarding."""
+
+    __tablename__ = "user_invitations"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    token: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    email: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True,
+    )
+    full_name: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    invited_by_user_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default="pending",
+        default="pending",
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="invitations")
+    invited_by: Mapped[Optional["User"]] = relationship("User", back_populates="sent_invitations", foreign_keys=[invited_by_user_id])
+
 
 
 class Plant(Base):
@@ -653,7 +735,7 @@ class File(Base):
     )
     created_by: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -1172,7 +1254,7 @@ class Anomaly(Base):
     )
     rca_by: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     status_note: Mapped[Optional[str]] = mapped_column(
@@ -1255,7 +1337,7 @@ class AuditLog(Base):
     )
     user_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     action: Mapped[str] = mapped_column(
@@ -1622,3 +1704,26 @@ class ChartRecord(Base):
 
     message: Mapped[Optional["Message"]] = relationship("Message", back_populates="charts")
 
+
+
+class PlatformSetting(Base):
+    """Platform-wide settings and configuration for Super Admin."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+    )
+    value: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=dict,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )

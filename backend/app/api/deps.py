@@ -89,23 +89,66 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if user.role != "super_admin":
+        if not user.org_id or not user.organization:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User does not belong to a valid organization",
+            )
+        if getattr(user.organization, "status", "active") == "suspended":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organization has been suspended. Please contact platform support.",
+            )
+        from app.models.entities import PlatformSetting
+        try:
+            m_setting = db.get(PlatformSetting, "saas_config")
+            if m_setting and m_setting.value and m_setting.value.get("maintenance_mode", False):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Platform is currently under scheduled maintenance. Non-administrative access is temporarily paused.",
+                )
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
     return user
 
 
 def require_role(*allowed_roles: str) -> Callable[[User], User]:
-    """Dependency factory enforcing role-based access control (RBAC)."""
+    """Dependency factory enforcing role-based access control (RBAC).
+    
+    A user with role 'super_admin' possesses universal administrative privileges
+    across roles, unless explicitly restricted.
+    """
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User role '{current_user.role}' is not authorized to access this resource",
-            )
-        return current_user
+        if current_user.role == "super_admin" or current_user.role in allowed_roles:
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"User role '{current_user.role}' is not authorized to access this resource",
+        )
     return role_checker
 
 
+def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency ensuring only Super Admin users can access this resource."""
+    if current_user.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Administrators can perform this action",
+        )
+    return current_user
+
+
 def enforce_org_access(current_user: User, target_org_id: UUID) -> None:
-    """Verify that current authenticated user belongs to the target organization."""
+    """Verify that current authenticated user belongs to the target organization.
+    
+    Super Admin users are granted cross-tenant administrative access.
+    """
+    if current_user.role == "super_admin":
+        return
     if current_user.org_id != target_org_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

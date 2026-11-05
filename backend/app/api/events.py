@@ -74,8 +74,9 @@ def get_events(
     query = (
         select(Event)
         .join(Plant, Event.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
     )
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
 
     if plant_id is not None:
         plant = db.get(Plant, plant_id)

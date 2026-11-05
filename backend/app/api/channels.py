@@ -86,13 +86,14 @@ def get_channels(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = db.execute(
+    query = (
         select(Channel)
         .join(Asset, Channel.asset_id == Asset.id)
         .join(Plant, Asset.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-        .order_by(Channel.source_name)
     )
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
+    result = db.execute(query.order_by(Channel.source_name))
 
     return result.scalars().all()
 

@@ -14,8 +14,34 @@ def client():
     return TestClient(app)
 
 
+def test_super_admin_login(client):
+    """Requirement 1, 2, 3: Super Admin authenticates through common login and receives super_admin role."""
+    db = SessionLocal()
+    try:
+        super_email = f"super_{uuid4().hex[:6]}@plantiq.io"
+        org = db.query(Organization).first()
+        super_user = User(
+            org_id=org.id,
+            email=super_email,
+            password_hash=get_password_hash("SuperAdmin#2026"),
+            full_name="Platform Super Admin",
+            role="super_admin",
+            is_active=True,
+        )
+        db.add(super_user)
+        db.commit()
+
+        response = client.post("/auth/login", json={"email": super_email, "password": "SuperAdmin#2026"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["role"] == "super_admin"
+        assert "access_token" in data
+    finally:
+        db.close()
+
+
 def test_admin_login(client):
-    response = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "SuryaAdmin#2026"})
+    response = client.post("/auth/login", json={"email": "surya@gmail.com", "password": "Password123!"})
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["role"] == "admin"
@@ -23,7 +49,7 @@ def test_admin_login(client):
 
 
 def test_engineer_login(client):
-    response = client.post("/auth/login", json={"email": "engineer@surya.plantiq.ai", "password": "SuryaEngineer#2026"})
+    response = client.post("/auth/login", json={"email": "satish@gmail.com", "password": "Password123!"})
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["role"] == "engineer"
@@ -31,7 +57,7 @@ def test_engineer_login(client):
 
 
 def test_viewer_login(client):
-    response = client.post("/auth/login", json={"email": "viewer@surya.plantiq.ai", "password": "SuryaViewer#2026"})
+    response = client.post("/auth/login", json={"email": "suresh@gmail.com", "password": "Password123!"})
     assert response.status_code == 200
     data = response.json()
     assert data["user"]["role"] == "viewer"
@@ -39,7 +65,7 @@ def test_viewer_login(client):
 
 
 def test_login_invalid_password(client):
-    response = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "WrongPassword"})
+    response = client.post("/auth/login", json={"email": "surya@gmail.com", "password": "WrongPassword"})
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid email or password"
 
@@ -200,73 +226,140 @@ def test_organization_isolation_across_users(client):
 # REGISTRATION & REFRESH TOKEN & AUDIT LOG TESTS
 # ----------------------------------------------------
 
-def test_register_admin_role(client):
-    unique_email = f"reg_admin_{uuid4().hex[:6]}@example.com"
+def test_public_registration_blocks_admin_escalation(client):
+    """Requirement 4 & 5: Public self-registration for admin role is prohibited (HTTP 403)."""
+    unique_email = f"reg_admin_fail_{uuid4().hex[:6]}@example.com"
     pw = "AdminPass#2026"
     response = client.post(
         "/auth/register",
         json={
             "email": unique_email,
             "password": pw,
-            "full_name": "Registered Admin User",
+            "full_name": "Unauthorized Admin Attempt",
             "organization_name": "Admin Test Org",
             "role": "admin",
         },
     )
-    assert response.status_code == 201
-    data = response.json()
-    assert data["user"]["email"] == unique_email
-    assert data["user"]["role"] == "admin"
-    assert "password" not in data["user"]
-    assert "password_hash" not in data["user"]
-
-    # Verify DB state
-    db = SessionLocal()
-    try:
-        user_db = db.query(User).filter(User.email == unique_email).first()
-        assert user_db is not None
-        assert user_db.role == "admin"
-    finally:
-        db.close()
-
-    # Login with registered Admin
-    login_res = client.post("/auth/login", json={"email": unique_email, "password": pw})
-    assert login_res.status_code == 200
-    token = login_res.json()["access_token"]
-    assert login_res.json()["user"]["role"] == "admin"
-
-    # Verify /auth/me returns admin role
-    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert me_res.status_code == 200
-    assert me_res.json()["role"] == "admin"
+    assert response.status_code == 403
+    assert "administrative roles is prohibited" in response.json()["detail"].lower()
 
 
-def test_register_engineer_role(client):
-    unique_email = f"reg_eng_{uuid4().hex[:6]}@example.com"
+def test_public_registration_blocks_super_admin_escalation(client):
+    """Requirement 6: Public self-registration for super_admin role is prohibited (HTTP 403)."""
+    unique_email = f"reg_super_fail_{uuid4().hex[:6]}@example.com"
+    pw = "SuperPass#2026"
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": unique_email,
+            "password": pw,
+            "full_name": "Unauthorized Super Admin Attempt",
+            "organization_name": "Super Admin Test Org",
+            "role": "super_admin",
+        },
+    )
+    assert response.status_code == 403
+    assert "administrative roles is prohibited" in response.json()["detail"].lower()
+
+
+def test_public_registration_blocks_engineer_without_invitation(client):
+    """Requirement 8: Engineer accounts must be created through authorized organization-level user management."""
+    unique_email = f"reg_eng_fail_{uuid4().hex[:6]}@example.com"
     pw = "EngineerPass#2026"
     response = client.post(
         "/auth/register",
         json={
             "email": unique_email,
             "password": pw,
-            "full_name": "Registered Engineer User",
+            "full_name": "Uninvited Engineer User",
             "organization_name": "Engineer Test Org",
             "role": "engineer",
         },
     )
-    assert response.status_code == 201
-    data = response.json()
-    assert data["user"]["role"] == "engineer"
+    assert response.status_code == 403
+    assert "engineer role is restricted" in response.json()["detail"].lower()
 
-    # Login with registered Engineer
-    login_res = client.post("/auth/login", json={"email": unique_email, "password": pw})
+
+def test_org_admin_cannot_create_another_admin(client):
+    """Requirement 7: Organization Admin cannot provision another Admin account (HTTP 403)."""
+    # Login as Org Admin
+    login_res = client.post("/auth/login", json={"email": "surya@gmail.com", "password": "Password123!"})
     assert login_res.status_code == 200
     token = login_res.json()["access_token"]
-    assert login_res.json()["user"]["role"] == "engineer"
+    headers = {"Authorization": f"Bearer {token}"}
 
-    me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert me_res.status_code == 200
-    assert me_res.json()["role"] == "engineer"
+    resp = client.post(
+        "/admin/users",
+        json={
+            "email": f"sub_admin_{uuid4().hex[:6]}@surya.com",
+            "password": "Password123!",
+            "full_name": "Second Admin Attempt",
+            "role": "admin",
+            "is_active": True,
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 403
+    assert "admin accounts must be provisioned by super admin" in resp.json()["detail"].lower()
+
+
+def test_login_blocked_for_suspended_organization(client):
+    """Requirement 9: Login is blocked with 403 if user's organization is suspended."""
+    db = SessionLocal()
+    try:
+        suspended_org = Organization(name=f"Suspended Org {uuid4().hex[:6]}", status="suspended")
+        db.add(suspended_org)
+        db.commit()
+        db.refresh(suspended_org)
+
+        user_email = f"susp_user_{uuid4().hex[:6]}@example.com"
+        suspended_user = User(
+            org_id=suspended_org.id,
+            email=user_email,
+            password_hash=get_password_hash("ValidPass#2026"),
+            full_name="Suspended Org User",
+            role="engineer",
+            is_active=True,
+        )
+        db.add(suspended_user)
+        db.commit()
+
+        login_res = client.post("/auth/login", json={"email": user_email, "password": "ValidPass#2026"})
+        assert login_res.status_code == 403
+        assert "organization has been suspended" in login_res.json()["detail"].lower()
+
+        # Also check /auth/me with token
+        tok = create_access_token({"sub": str(suspended_user.id), "org_id": str(suspended_org.id), "role": "engineer"})
+        me_res = client.get("/auth/me", headers={"Authorization": f"Bearer {tok}"})
+        assert me_res.status_code == 403
+    finally:
+        db.close()
+
+
+def test_user_without_valid_organization_cannot_login(client):
+    """Requirement 9: User without an existing organization cannot log in."""
+    db = SessionLocal()
+    try:
+        user_email = f"no_org_{uuid4().hex[:6]}@example.com"
+        orphan_user = User(
+            org_id=uuid4(),  # Non-existent organization ID
+            email=user_email,
+            password_hash=get_password_hash("ValidPass#2026"),
+            full_name="Orphan User",
+            role="engineer",
+            is_active=True,
+        )
+        db.add(orphan_user)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            return  # If foreign key constraint blocks orphan user creation at DB level, isolation is already enforced!
+
+        login_res = client.post("/auth/login", json={"email": user_email, "password": "ValidPass#2026"})
+        assert login_res.status_code == 403
+    finally:
+        db.close()
 
 
 def test_register_viewer_role(client):
@@ -315,8 +408,8 @@ def test_register_duplicate_email(client):
     response = client.post(
         "/auth/register",
         json={
-            "email": "admin@surya.plantiq.ai",
-            "password": "SuryaAdmin#2026",
+            "email": "surya@gmail.com",
+            "password": "Password123!",
             "full_name": "Duplicate Admin",
         },
     )
@@ -339,7 +432,7 @@ def test_register_short_password(client):
 
 def test_refresh_token_success(client):
     # First login to get refresh token
-    login_res = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "SuryaAdmin#2026"})
+    login_res = client.post("/auth/login", json={"email": "surya@gmail.com", "password": "Password123!"})
     assert login_res.status_code == 200
     refresh_tok = login_res.json()["refresh_token"]
 
@@ -349,12 +442,12 @@ def test_refresh_token_success(client):
     data = ref_res.json()
     assert "access_token" in data
     assert "refresh_token" in data
-    assert data["user"]["email"] == "admin@surya.plantiq.ai"
+    assert data["user"]["email"] == "surya@gmail.com"
 
 
 def test_refresh_token_using_access_token_fails(client):
     # Get access token
-    login_res = client.post("/auth/login", json={"email": "admin@surya.plantiq.ai", "password": "SuryaAdmin#2026"})
+    login_res = client.post("/auth/login", json={"email": "surya@gmail.com", "password": "Password123!"})
     access_tok = login_res.json()["access_token"]
 
     # Try passing access token as refresh token -> must fail 401
@@ -378,3 +471,66 @@ def test_audit_log_safety(client):
         db_session.expunge_all()
         db_session.rollback()
         db_session.close()
+
+
+def test_platform_admin_login_super_admin_success(client):
+    """Phase 3 & 7: Super Admin authenticates through Platform Admin Portal with portal=platform_admin."""
+    db = SessionLocal()
+    try:
+        super_email = f"super_portal_{uuid4().hex[:6]}@plantiq.io"
+        org = db.query(Organization).first()
+        super_user = User(
+            org_id=org.id,
+            email=super_email,
+            password_hash=get_password_hash("SuperAdmin#2026"),
+            full_name="Platform Super Admin Portal Test",
+            role="super_admin",
+            is_active=True,
+        )
+        db.add(super_user)
+        db.commit()
+
+        response = client.post("/auth/login", json={
+            "email": super_email,
+            "password": "SuperAdmin#2026",
+            "portal": "platform_admin",
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["role"] == "super_admin"
+        assert "access_token" in data
+    finally:
+        db.close()
+
+
+def test_platform_admin_login_org_admin_blocked(client):
+    """Phase 3 & 7: Organization Admin attempting to authenticate on Platform Admin Portal is strictly blocked."""
+    response = client.post("/auth/login", json={
+        "email": "surya@gmail.com",
+        "password": "Password123!",
+        "portal": "platform_admin",
+    })
+    assert response.status_code == 403
+    assert "Platform Admin Portal is strictly restricted to Platform Super Administrators" in response.json()["detail"]
+
+
+def test_platform_admin_login_engineer_blocked(client):
+    """Phase 3 & 7: Engineer attempting to authenticate on Platform Admin Portal is strictly blocked."""
+    response = client.post("/auth/login", json={
+        "email": "satish@gmail.com",
+        "password": "Password123!",
+        "portal": "platform_admin",
+    })
+    assert response.status_code == 403
+    assert "Platform Admin Portal is strictly restricted to Platform Super Administrators" in response.json()["detail"]
+
+
+def test_platform_admin_login_viewer_blocked(client):
+    """Phase 3 & 7: Viewer attempting to authenticate on Platform Admin Portal is strictly blocked."""
+    response = client.post("/auth/login", json={
+        "email": "suresh@gmail.com",
+        "password": "Password123!",
+        "portal": "platform_admin",
+    })
+    assert response.status_code == 403
+    assert "Platform Admin Portal is strictly restricted to Platform Super Administrators" in response.json()["detail"]

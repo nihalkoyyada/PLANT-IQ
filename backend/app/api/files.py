@@ -479,11 +479,11 @@ def get_files(
         enforce_org_access(current_user, org_id)
         target_org_id = org_id
 
-    query = (
-        select(File)
-        .where(File.org_id == target_org_id)
-        .order_by(File.created_at.desc())
-    )
+    query = select(File).order_by(File.created_at.desc())
+    if current_user.role != "super_admin":
+        query = query.where(File.org_id == target_org_id)
+    elif org_id is not None:
+        query = query.where(File.org_id == target_org_id)
 
     result = db.execute(query).scalars().all()
 
@@ -508,7 +508,7 @@ def get_active_telemetry_sources(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve all files associated with active telemetry readings in the database."""
-    active_rows = db.execute(
+    active_query = (
         select(
             File.id,
             File.original_name,
@@ -524,22 +524,27 @@ def get_active_telemetry_sources(
         .join(IngestionJob, IngestionJob.file_id == File.id)
         .join(Reading, Reading.ingestion_job_id == IngestionJob.id)
         .outerjoin(Channel, Reading.channel_id == Channel.id)
-        .where(File.org_id == current_user.org_id)
+    )
+    if current_user.role != "super_admin":
+        active_query = active_query.where(File.org_id == current_user.org_id)
+    active_rows = db.execute(
+        active_query
         .group_by(File.id, File.original_name, File.path, File.size_bytes)
         .order_by(func.count(Reading.ts).desc())
     ).all()
 
     # Determine signal types and dataset classification for ANY uploaded dataset
-    key_rows = db.execute(
+    key_query = (
         select(File.id, Channel.canonical_key, Asset.asset_type)
         .select_from(File)
         .join(IngestionJob, IngestionJob.file_id == File.id)
         .join(Reading, Reading.ingestion_job_id == IngestionJob.id)
         .join(Channel, Reading.channel_id == Channel.id)
         .outerjoin(Asset, Channel.asset_id == Asset.id)
-        .where(File.org_id == current_user.org_id)
-        .distinct()
-    ).all()
+    )
+    if current_user.role != "super_admin":
+        key_query = key_query.where(File.org_id == current_user.org_id)
+    key_rows = db.execute(key_query.distinct()).all()
 
     weather_keys = {
         "irradiance_poa",
@@ -625,9 +630,10 @@ def get_active_telemetry_sources(
     ).scalars().all()
     completed_job_file_ids = {j.file_id for j in completed_jobs}
 
-    all_files = db.execute(
-        select(File).where(File.org_id == current_user.org_id).order_by(File.created_at.desc())
-    ).scalars().all()
+    all_files_query = select(File).order_by(File.created_at.desc())
+    if current_user.role != "super_admin":
+        all_files_query = all_files_query.where(File.org_id == current_user.org_id)
+    all_files = db.execute(all_files_query).scalars().all()
 
     # Build mapping of completed job file_id to original_name for reliable cross-file matching
     job_file_map = {}

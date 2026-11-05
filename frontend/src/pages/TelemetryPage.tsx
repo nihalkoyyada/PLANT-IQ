@@ -6,7 +6,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import {
@@ -113,7 +112,7 @@ const getAssetNameForChannel = (channel: Channel, assetsList: Asset[]): string =
 export const TelemetryPage: React.FC<{
   onAskCopilot?: (prompt: string, context?: any) => void;
 }> = ({ onAskCopilot }) => {
-  const { activeDatasets } = useActiveDatasets();
+  const { activeDatasets, activeSources, allFilesSummary } = useActiveDatasets();
   const [plants, setPlants] = useState<Plant[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -137,6 +136,21 @@ export const TelemetryPage: React.FC<{
   });
 
   const [activeTableChannelId, setActiveTableChannelId] = useState<string>('');
+  const [activeMetricFilter, setActiveMetricFilter] = useState<string>('all');
+  const [mutedChannelIds, setMutedChannelIds] = useState<Set<string>>(new Set());
+  const [isTagsExpanded, setIsTagsExpanded] = useState<boolean>(false);
+
+  const handleToggleMute = (channelId: string) => {
+    setMutedChannelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(channelId)) {
+        next.delete(channelId);
+      } else {
+        next.add(channelId);
+      }
+      return next;
+    });
+  };
 
   /*
    * Scope detection based on selected datasets
@@ -361,6 +375,44 @@ export const TelemetryPage: React.FC<{
   }, [selectedChannelIds, channelInfoMap]);
 
   /*
+   * Unique available metrics across selected channels
+   */
+  const availableMetrics = useMemo(() => {
+    const metrics: string[] = [];
+    selectedChannelsInfo.forEach((info) => {
+      if (!metrics.includes(info.metricName)) {
+        metrics.push(info.metricName);
+      }
+    });
+    return metrics;
+  }, [selectedChannelsInfo]);
+
+  /*
+   * Channels to display on chart (filtered by active metric, if specified)
+   */
+  const displayedChannelsInfo = useMemo(() => {
+    if (activeMetricFilter === 'all' || !availableMetrics.includes(activeMetricFilter)) {
+      return selectedChannelsInfo;
+    }
+    return selectedChannelsInfo.filter((info) => info.metricName === activeMetricFilter);
+  }, [selectedChannelsInfo, activeMetricFilter, availableMetrics]);
+
+  /*
+   * Synchronize muted channels when selectedChannelIds change
+   */
+  useEffect(() => {
+    setMutedChannelIds((prev) => {
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (selectedChannelIds.includes(id)) {
+          next.add(id);
+        }
+      });
+      return next;
+    });
+  }, [selectedChannelIds]);
+
+  /*
    * Fetch aggregate data in parallel for ALL selected channels whenever selected channels, interval, or date range changes
    */
   useEffect(() => {
@@ -525,7 +577,7 @@ export const TelemetryPage: React.FC<{
     }
 
     // Build CSV Headers: Timestamp, Inverter 01 — AC Power (kW), Inverter 01 — DC Power (kW)...
-    const activeSourcesInfo = activeDatasets.length > 0 ? activeDatasets.join('; ') : 'Surya-A-demo.csv';
+    const activeSourcesInfo = activeDatasets.length > 0 ? activeDatasets.join('; ') : activeSources[0]?.original_name || allFilesSummary[0]?.original_name || 'Plant_1_Generation_Data.csv';
     const metadataComment = `# PlantIQ Telemetry Export - Active Datasets: ${activeSourcesInfo}\n# Date Range: ${appliedRange.start} to ${appliedRange.end}\n`;
     const headers = [
       'Timestamp',
@@ -558,8 +610,8 @@ export const TelemetryPage: React.FC<{
 
   // Determine Y-Axis Label
   const yAxisLabel = useMemo(() => {
-    if (selectedChannelsInfo.length === 0) return 'Value';
-    const units = new Set(selectedChannelsInfo.map((i) => i.unit));
+    if (displayedChannelsInfo.length === 0) return 'Value';
+    const units = new Set(displayedChannelsInfo.map((i) => i.unit));
     if (units.size === 1) {
       const unit = Array.from(units)[0];
       return unit === 'kW'
@@ -573,15 +625,19 @@ export const TelemetryPage: React.FC<{
         : `Value (${unit})`;
     }
     return 'Value';
-  }, [selectedChannelsInfo]);
+  }, [displayedChannelsInfo]);
 
   // Determine active channel for table view
   const primaryTableChannel = useMemo(() => {
     if (activeTableChannelId && selectedChannelIds.includes(activeTableChannelId)) {
-      return selectedChannelsInfo.find((i) => i.id === activeTableChannelId) || selectedChannelsInfo[0];
+      return (
+        selectedChannelsInfo.find((i) => i.id === activeTableChannelId) ||
+        displayedChannelsInfo[0] ||
+        selectedChannelsInfo[0]
+      );
     }
-    return selectedChannelsInfo[0] || null;
-  }, [activeTableChannelId, selectedChannelIds, selectedChannelsInfo]);
+    return displayedChannelsInfo[0] || selectedChannelsInfo[0] || null;
+  }, [activeTableChannelId, selectedChannelIds, selectedChannelsInfo, displayedChannelsInfo]);
 
   const activeTableReadings = useMemo(() => {
     if (!primaryTableChannel) return [];
@@ -620,7 +676,7 @@ export const TelemetryPage: React.FC<{
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="font-semibold text-slate-500">FEED:</span>
                 <span className="text-slate-800 font-medium">
-                  {activeDatasets.length > 0 ? activeDatasets.join(', ') : 'Surya-A-demo.csv'}
+                  {activeDatasets.length > 0 ? activeDatasets.join(', ') : activeSources[0]?.original_name || allFilesSummary[0]?.original_name || 'Plant_1_Generation_Data.csv'}
                 </span>
               </div>
             </div>
@@ -750,15 +806,25 @@ export const TelemetryPage: React.FC<{
                 <Layers className="w-3.5 h-3.5 text-sky-600" />
                 Selected Telemetry Series ({selectedChannelsInfo.length})
               </span>
-              {selectedChannelsInfo.length > 0 && (
-                <button
-                  onClick={handleClearAll}
-                  className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Clear All
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {selectedChannelsInfo.length > 8 && (
+                  <button
+                    onClick={() => setIsTagsExpanded((prev) => !prev)}
+                    className="text-[11px] text-sky-600 hover:text-sky-800 font-semibold"
+                  >
+                    {isTagsExpanded ? 'Collapse' : `View All (${selectedChannelsInfo.length})`}
+                  </button>
+                )}
+                {selectedChannelsInfo.length > 0 && (
+                  <button
+                    onClick={handleClearAll}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
 
             {selectedChannelsInfo.length === 0 ? (
@@ -766,7 +832,11 @@ export const TelemetryPage: React.FC<{
                 No channels selected. Expand the Asset Hierarchy on the left to select signals.
               </div>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
+              <div
+                className={`flex flex-wrap gap-1.5 transition-all ${
+                  isTagsExpanded ? 'max-h-72' : 'max-h-20'
+                } overflow-y-auto pr-1`}
+              >
                 {selectedChannelsInfo.map((info) => (
                   <div
                     key={info.id}
@@ -793,13 +863,13 @@ export const TelemetryPage: React.FC<{
 
           {/* MULTI-CHANNEL CHART CARD */}
           <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-xs space-y-3">
-            <div className="border-b border-slate-100 pb-2 flex items-center justify-between">
+            <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <h3 className="text-xs font-mono font-bold uppercase text-slate-800 tracking-wider flex items-center gap-2">
                   <Activity className="w-4 h-4 text-sky-600" />
                   <span>
-                    {selectedChannelsInfo.length > 0
-                      ? `Multi-Channel Curve Explorer (${selectedChannelsInfo.length} Series)`
+                    {displayedChannelsInfo.length > 0
+                      ? `Multi-Channel Curve Explorer (${displayedChannelsInfo.length} Series)`
                       : 'Telemetry Explorer'}
                   </span>
                 </h3>
@@ -808,12 +878,68 @@ export const TelemetryPage: React.FC<{
                 </p>
               </div>
 
-              <span className="text-xs font-mono text-slate-500 font-semibold">
-                {alignedChartPoints.length} Timestamps
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-500 font-semibold">
+                  {alignedChartPoints.length} Timestamps
+                </span>
+              </div>
             </div>
 
-            <div className="h-80 w-full relative pt-2">
+            {/* METRIC FILTER BAR FOR MULTI-SERIES EXPLORATION */}
+            {availableMetrics.length > 1 && (
+              <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                <span className="text-[10px] font-mono font-bold uppercase text-slate-500 mr-1 flex items-center gap-1">
+                  <SlidersHorizontal className="w-3 h-3 text-sky-600" />
+                  Filter Metric:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveMetricFilter('all')}
+                  className={`px-2.5 py-1 rounded text-xs font-mono transition ${
+                    activeMetricFilter === 'all'
+                      ? 'bg-[#004874] text-white font-bold shadow-xs'
+                      : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200/70'
+                  }`}
+                >
+                  All Series ({selectedChannelsInfo.length})
+                </button>
+                {availableMetrics.map((metric) => {
+                  const count = selectedChannelsInfo.filter((c) => c.metricName === metric).length;
+                  const isSel = activeMetricFilter === metric;
+                  return (
+                    <button
+                      key={metric}
+                      type="button"
+                      onClick={() => setActiveMetricFilter(metric)}
+                      className={`px-2.5 py-1 rounded text-xs font-mono transition ${
+                        isSel
+                          ? 'bg-[#004874] text-white font-bold shadow-xs'
+                          : 'bg-white hover:bg-slate-200 text-slate-700 border border-slate-200/70'
+                      }`}
+                    >
+                      {metric} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* HIGH DENSITY SERIES TIP */}
+            {displayedChannelsInfo.length > 16 && (
+              <div className="text-[11px] font-mono text-sky-800 bg-sky-50 border border-sky-100 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                <span>
+                  Showing {displayedChannelsInfo.length} synchronized curves across {alignedChartPoints.length} timestamps.
+                </span>
+                {activeMetricFilter === 'all' && availableMetrics.length > 1 && (
+                  <span className="text-slate-500 text-[10px] hidden md:inline">
+                    Tip: Select a metric above (e.g. AC Power) to isolate curves on an aligned scale.
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* CHART DISPLAY AREA */}
+            <div className="h-[400px] w-full relative pt-2">
               {loading ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-50/70 rounded-lg z-10">
                   <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
@@ -838,8 +964,8 @@ export const TelemetryPage: React.FC<{
                   <LineChart
                     data={alignedChartPoints}
                     margin={{
-                      top: 10,
-                      right: 15,
+                      top: 15,
+                      right: 20,
                       left: 15,
                       bottom: 25,
                     }}
@@ -874,67 +1000,127 @@ export const TelemetryPage: React.FC<{
                       }}
                     />
                     <Tooltip
-                      content={({ active, payload, label }) => {
+                      content={({ active, payload }) => {
                         if (!active || !payload || !payload.length) return null;
                         const pt = payload[0].payload;
+                        const activeEntries = displayedChannelsInfo
+                          .filter((info) => !mutedChannelIds.has(info.id))
+                          .map((info) => ({
+                            info,
+                            val: pt[info.id],
+                          }))
+                          .filter((entry) => entry.val !== undefined && entry.val !== null);
+
                         return (
-                          <div className="bg-[#004874] border border-[#0284c7] text-white p-3 rounded-xl shadow-xl text-xs font-mono space-y-1.5 min-w-[220px]">
-                            <div className="font-bold border-b border-sky-600/60 pb-1 text-sky-200">
-                              {pt.time}
+                          <div className="bg-[#004874] border border-[#0284c7] text-white p-3 rounded-xl shadow-xl text-xs font-mono space-y-1.5 min-w-[240px] max-w-[340px]">
+                            <div className="flex items-center justify-between border-b border-sky-600/60 pb-1 text-sky-200">
+                              <span className="font-bold">{pt.time}</span>
+                              <span className="text-[10px] text-sky-300">{activeEntries.length} Signals</span>
                             </div>
-                            <div className="space-y-1">
-                              {selectedChannelsInfo.map((info) => {
-                                const val = pt[info.id];
-                                if (val === undefined || val === null) return null;
-                                return (
-                                  <div
-                                    key={info.id}
-                                    className="flex items-center justify-between gap-3 text-[11px]"
-                                  >
-                                    <span className="flex items-center gap-1.5 truncate">
-                                      <span
-                                        className="w-2 h-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: info.color }}
-                                      />
-                                      <span className="truncate">{info.displayName}</span>
-                                    </span>
-                                    <span className="font-bold text-emerald-300 whitespace-nowrap">
-                                      {val.toLocaleString()} {info.unit}
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                            <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                              {activeEntries.slice(0, 15).map(({ info, val }) => (
+                                <div
+                                  key={info.id}
+                                  className="flex items-center justify-between gap-3 text-[11px]"
+                                >
+                                  <span className="flex items-center gap-1.5 truncate">
+                                    <span
+                                      className="w-2 h-2 rounded-full shrink-0"
+                                      style={{ backgroundColor: info.color }}
+                                    />
+                                    <span className="truncate">{info.displayName}</span>
+                                  </span>
+                                  <span className="font-bold text-emerald-300 whitespace-nowrap">
+                                    {typeof val === 'number'
+                                      ? val.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                      : val}{' '}
+                                    {info.unit}
+                                  </span>
+                                </div>
+                              ))}
+                              {activeEntries.length > 15 && (
+                                <div className="text-[10px] text-sky-300/80 italic text-center pt-1 border-t border-sky-600/30">
+                                  + {activeEntries.length - 15} more series (filter metric to isolate)
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
                       }}
                     />
-                    <Legend
-                      verticalAlign="top"
-                      height={36}
-                      formatter={(value, entry) => (
-                        <span className="text-xs font-mono text-slate-700 font-semibold mr-3">
-                          {value}
-                        </span>
-                      )}
-                    />
-                    {selectedChannelsInfo.map((info) => (
-                      <Line
-                        key={info.id}
-                        type="monotone"
-                        dataKey={info.id}
-                        name={info.displayName}
-                        stroke={info.color}
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 5 }}
-                        connectNulls={false}
-                      />
-                    ))}
+                    {displayedChannelsInfo.map((info) => {
+                      if (mutedChannelIds.has(info.id)) return null;
+                      return (
+                        <Line
+                          key={info.id}
+                          type="monotone"
+                          dataKey={info.id}
+                          name={info.displayName}
+                          stroke={info.color}
+                          strokeWidth={displayedChannelsInfo.length > 20 ? 1.5 : 2}
+                          dot={false}
+                          activeDot={{ r: 4 }}
+                          connectNulls={false}
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               )}
             </div>
+
+            {/* DEDICATED RESPONSIVE SCROLLABLE SERIES LEGEND */}
+            {displayedChannelsInfo.length > 0 && alignedChartPoints.length > 0 && (
+              <div className="mt-2 border border-slate-200/80 rounded-xl bg-slate-50/70 p-2.5">
+                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                    <Layers className="w-3 h-3 text-sky-600" />
+                    Active Series Legend ({displayedChannelsInfo.length})
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {mutedChannelIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMutedChannelIds(new Set())}
+                        className="text-[10px] font-mono text-sky-600 hover:text-sky-800 font-semibold"
+                      >
+                        Reset Muted ({mutedChannelIds.size})
+                      </button>
+                    )}
+                    {displayedChannelsInfo.length > 8 && (
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Scroll to explore • Click to toggle
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-28 overflow-y-auto pr-1 flex flex-wrap gap-1.5">
+                  {displayedChannelsInfo.map((info) => {
+                    const isMuted = mutedChannelIds.has(info.id);
+                    return (
+                      <button
+                        key={info.id}
+                        type="button"
+                        onClick={() => handleToggleMute(info.id)}
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-mono border transition cursor-pointer ${
+                          isMuted
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 line-through opacity-60'
+                            : 'bg-white border-slate-200 text-slate-800 hover:border-slate-300 shadow-2xs'
+                        }`}
+                        title={`Click to ${isMuted ? 'show' : 'hide'} ${info.displayName}`}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: isMuted ? '#94a3b8' : info.color }}
+                        />
+                        <span className="font-semibold">{info.displayName}</span>
+                        <span className="text-[9px] text-slate-400 font-mono">({info.unit})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* TELEMETRY READINGS TABLE */}

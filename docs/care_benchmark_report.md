@@ -1,7 +1,7 @@
 # PlantIQ: CARE Benchmark & Detector Validation Report (§12, Task S4-AI-05)
 
-**Benchmark Run ID:** `CARE-A4196A6E`  
-**Date:** 2026-10-28 07:33:54 UTC  
+**Benchmark Run ID:** `CARE-932EA74D`  
+**Date:** 2026-11-03 07:09:49 UTC  
 **Target System:** Surya-A Solar Park (Plant 1, 28.28 MWp DC / 27.50 MW AC)  
 **Evaluated Algorithms:** D1 (Statistical Outlier), D2 (PR Deviation), D3 (Irradiance Residual), D4 (Isolation Forest), Rule Baselines & Ensemble  
 **Status:** **BENCHMARK COMPLETE (VERIFIED)**  
@@ -49,9 +49,9 @@ Classification metrics evaluate event-level incident capture and sample-level di
 
 | Detector / Model | Event Precision | Event Recall | Event F1 | Interval F1 | False Alarm Rate (FAR) | Mean Lead Time | Throughput |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Inverter Trip Detector** | 0.3% | 100.0% | **0.006** | 0.040 | 1.54% | 3.8 hrs | 1,534,086 rows/s |
-| **Sensor Flatline Detector** | 16.7% | 100.0% | **0.286** | 0.131 | 0.00% | 1.8 hrs | 1,945,047 rows/s |
-| **CARE Multi-Model Ensemble** | 1.2% | 100.0% | **0.023** | 0.138 | 1.54% | 70.1 hrs | 854,228 rows/s |
+| **Inverter Trip Detector** | 0.3% | 100.0% | **0.006** | 0.040 | 1.54% | 3.8 hrs | 1,837,524 rows/s |
+| **Sensor Flatline Detector** | 16.7% | 100.0% | **0.286** | 0.131 | 0.00% | 1.8 hrs | 2,603,747 rows/s |
+| **CARE Multi-Model Ensemble** | 1.2% | 100.0% | **0.023** | 0.138 | 1.54% | 70.1 hrs | 827,766 rows/s |
 
 ---
 

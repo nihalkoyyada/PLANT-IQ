@@ -71,7 +71,7 @@ export const CopilotPage: React.FC<CopilotPageProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const plantId = selectedPlant?.id || 'd253760d-d8ad-4a18-b655-fc22a5222d59';
+  const plantId = selectedPlant?.id;
 
   // Load Copilot runtime info and conversation list on mount
   useEffect(() => {
@@ -100,6 +100,7 @@ export const CopilotPage: React.FC<CopilotPageProps> = ({
   }, [messages, isStreaming]);
 
   const loadConversations = async () => {
+    if (!plantId) return;
     try {
       const list = await listConversations(plantId);
       setConversations(list);
@@ -161,6 +162,10 @@ export const CopilotPage: React.FC<CopilotPageProps> = ({
   const handleSendMessage = async (promptToSend?: string) => {
     const text = (promptToSend || inputPrompt).trim();
     if (!text || isStreaming) return;
+    if (!plantId) {
+      setStreamError('Please select a plant to interact with the Solar Copilot.');
+      return;
+    }
 
     setInputPrompt('');
     setStreamError(null);

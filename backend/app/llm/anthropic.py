@@ -1,4 +1,4 @@
-﻿"""Anthropic Messages API Provider implementation."""
+"""Anthropic Messages API Provider implementation."""
 
 from __future__ import annotations
 
@@ -40,6 +40,7 @@ class AnthropicProvider(BaseProvider):
         backoff_multiplier: float = 2.0,
         usage_recorders: Optional[List[UsageRecorder]] = None,
         client: Optional[httpx.AsyncClient] = None,
+        enable_prompt_caching: bool = True,
     ) -> None:
         super().__init__(
             model=model,
@@ -52,13 +53,17 @@ class AnthropicProvider(BaseProvider):
         self.api_key = api_key
         self.base_url = (base_url.rstrip("/") if base_url else "https://api.anthropic.com") + "/v1/messages"
         self._client = client
+        self.enable_prompt_caching = enable_prompt_caching
 
     def _get_headers(self) -> Dict[str, str]:
-        return {
+        headers = {
             "x-api-key": self.api_key,
             "anthropic-version": ANTHROPIC_VERSION,
             "content-type": "application/json",
         }
+        if self.enable_prompt_caching:
+            headers["anthropic-beta"] = "prompt-caching-2024-07-25"
+        return headers
 
     def _format_payload(
         self,
@@ -69,7 +74,7 @@ class AnthropicProvider(BaseProvider):
         temperature: float = 0.0,
         stream: bool = False,
     ) -> Dict[str, Any]:
-        """Convert standard types to Anthropic API request payload."""
+        """Convert standard types to Anthropic API request payload with prompt caching support."""
         anthropic_msgs: List[Dict[str, Any]] = []
 
         for msg in messages:
@@ -90,17 +95,30 @@ class AnthropicProvider(BaseProvider):
         }
 
         if system:
-            payload["system"] = system
+            if self.enable_prompt_caching:
+                payload["system"] = [
+                    {
+                        "type": "text",
+                        "text": system,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
+            else:
+                payload["system"] = system
 
         if tools:
-            payload["tools"] = [
-                {
+            formatted_tools: List[Dict[str, Any]] = []
+            for idx, t in enumerate(tools):
+                tool_dict: Dict[str, Any] = {
                     "name": t.name,
                     "description": t.description,
                     "input_schema": t.parameters,
                 }
-                for t in tools
-            ]
+                # Place cache_control on the last tool to cache the prefix including all tools
+                if self.enable_prompt_caching and idx == len(tools) - 1:
+                    tool_dict["cache_control"] = {"type": "ephemeral"}
+                formatted_tools.append(tool_dict)
+            payload["tools"] = formatted_tools
 
         return payload
 
@@ -171,6 +189,8 @@ class AnthropicProvider(BaseProvider):
         usage = Usage(
             input_tokens=usage_data.get("input_tokens", 0),
             output_tokens=usage_data.get("output_tokens", 0),
+            cache_creation_input_tokens=usage_data.get("cache_creation_input_tokens", 0),
+            cache_read_input_tokens=usage_data.get("cache_read_input_tokens", 0),
         )
 
         model_name = data.get("model", self.model)
@@ -212,6 +232,8 @@ class AnthropicProvider(BaseProvider):
         current_tool_json = ""
         accumulated_input_tokens = 0
         accumulated_output_tokens = 0
+        accumulated_cache_creation_tokens = 0
+        accumulated_cache_read_tokens = 0
 
         client_ctx = self._client or httpx.AsyncClient(timeout=timeout_s)
         try:
@@ -243,6 +265,8 @@ class AnthropicProvider(BaseProvider):
                     if e_type == "message_start":
                         msg_usage = event.get("message", {}).get("usage", {})
                         accumulated_input_tokens = msg_usage.get("input_tokens", 0)
+                        accumulated_cache_creation_tokens = msg_usage.get("cache_creation_input_tokens", 0)
+                        accumulated_cache_read_tokens = msg_usage.get("cache_read_input_tokens", 0)
 
                     elif e_type == "content_block_start":
                         block = event.get("content_block", {})
@@ -291,6 +315,8 @@ class AnthropicProvider(BaseProvider):
                             usage=Usage(
                                 input_tokens=accumulated_input_tokens,
                                 output_tokens=accumulated_output_tokens,
+                                cache_creation_input_tokens=accumulated_cache_creation_tokens,
+                                cache_read_input_tokens=accumulated_cache_read_tokens,
                             ),
                         )
         finally:

@@ -80,12 +80,15 @@ def get_llm_provider(
         resolved_model = model or os.getenv("LLM_MODEL") or DEFAULT_ANTHROPIC_MODEL
         resolved_url = base_url or os.getenv("LLM_BASE_URL")
 
+        enable_caching = os.getenv("ANTHROPIC_PROMPT_CACHING", "true").lower() in ("true", "1", "yes")
+
         return AnthropicProvider(
             api_key=resolved_key,
             model=resolved_model,
             base_url=resolved_url,
             usage_recorders=usage_recorders,
             client=client,
+            enable_prompt_caching=enable_caching,
         )
 
     if resolved_provider in ("openai_compatible", "vllm", "openai"):

@@ -185,6 +185,102 @@ class TestAnthropicProvider:
         stop_reasons = [d.stop_reason for d in deltas if d.stop_reason]
         assert stop_reasons == ["tool_use"]
 
+    @pytest.mark.asyncio
+    async def test_prompt_caching_payload_and_usage(
+        self, sample_messages: List[Message], sample_tool: ToolDefinition
+    ) -> None:
+        """Verify that prompt caching headers, payload blocks, and cache usage metrics are properly formatted."""
+        tool2 = ToolDefinition(
+            name="get_plant_summary",
+            description="Fetch summary metrics for a plant.",
+            parameters={"type": "object", "properties": {}},
+        )
+
+        mock_response = {
+            "id": "msg_cache_01",
+            "model": "claude-3-7-sonnet-20250219",
+            "content": [{"type": "text", "text": "Cached response synthesis."}],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 15,
+                "output_tokens": 30,
+                "cache_creation_input_tokens": 1250,
+                "cache_read_input_tokens": 2400,
+            },
+        }
+
+        captured_request: Dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert request.headers.get("anthropic-beta") == "prompt-caching-2024-07-25"
+            body = json.loads(request.content.decode())
+            captured_request.update(body)
+            return httpx.Response(200, json=mock_response)
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        provider = AnthropicProvider(api_key="test-key", client=client, enable_prompt_caching=True)
+
+        system_prompt = "You are PlantIQ Copilot."
+        resp = await provider.chat(
+            messages=sample_messages,
+            tools=[sample_tool, tool2],
+            system=system_prompt,
+        )
+
+        # 1. System block formatted as list with cache_control
+        assert isinstance(captured_request.get("system"), list)
+        assert captured_request["system"][0]["type"] == "text"
+        assert captured_request["system"][0]["text"] == system_prompt
+        assert captured_request["system"][0]["cache_control"] == {"type": "ephemeral"}
+
+        # 2. Last tool in list has cache_control; previous tool does not
+        tools_payload = captured_request.get("tools", [])
+        assert len(tools_payload) == 2
+        assert "cache_control" not in tools_payload[0]
+        assert tools_payload[1]["cache_control"] == {"type": "ephemeral"}
+
+        # 3. Usage contains cache counters
+        assert resp.usage.input_tokens == 15
+        assert resp.usage.output_tokens == 30
+        assert resp.usage.cache_creation_input_tokens == 1250
+        assert resp.usage.cache_read_input_tokens == 2400
+
+    @pytest.mark.asyncio
+    async def test_prompt_caching_disabled(
+        self, sample_messages: List[Message], sample_tool: ToolDefinition
+    ) -> None:
+        """Verify payload when prompt caching is explicitly disabled."""
+        mock_response = {
+            "id": "msg_nocache_01",
+            "model": "claude-3-7-sonnet-20250219",
+            "content": [{"type": "text", "text": "Uncached response."}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 100, "output_tokens": 20},
+        }
+
+        captured_request: Dict[str, Any] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            assert "anthropic-beta" not in request.headers
+            body = json.loads(request.content.decode())
+            captured_request.update(body)
+            return httpx.Response(200, json=mock_response)
+
+        client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+        provider = AnthropicProvider(api_key="test-key", client=client, enable_prompt_caching=False)
+
+        system_prompt = "You are PlantIQ Copilot."
+        resp = await provider.chat(
+            messages=sample_messages,
+            tools=[sample_tool],
+            system=system_prompt,
+        )
+
+        assert captured_request.get("system") == system_prompt
+        assert "cache_control" not in captured_request["tools"][0]
+        assert resp.usage.cache_creation_input_tokens == 0
+        assert resp.usage.cache_read_input_tokens == 0
+
 
 class TestOpenAICompatibleProvider:
     """Test suite for OpenAICompatibleProvider (vLLM) using mocked HTTP transport."""

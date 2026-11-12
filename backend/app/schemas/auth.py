@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, EmailStr
 class LoginRequest(BaseModel):
     email: str = Field(..., description="User login email address")
     password: str = Field(..., min_length=1, description="User password")
+    portal: Optional[str] = Field(default=None, description="Target portal: 'platform_admin' or 'scada'")
 
 
 class RegisterRequest(BaseModel):
@@ -15,6 +16,7 @@ class RegisterRequest(BaseModel):
     org_id: Optional[UUID] = Field(default=None, description="Optional existing organization ID")
     organization_name: Optional[str] = Field(default=None, description="Optional new organization name if creating org")
     role: Optional[str] = Field(default="viewer", description="User role: admin, engineer, viewer")
+    invitation_token: Optional[str] = Field(default=None, description="Cryptographic invitation token for controlled onboarding")
 
 
 class RefreshRequest(BaseModel):
@@ -23,7 +25,7 @@ class RefreshRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    org_id: UUID
+    org_id: Optional[UUID] = None
     email: str
     full_name: str
     role: str

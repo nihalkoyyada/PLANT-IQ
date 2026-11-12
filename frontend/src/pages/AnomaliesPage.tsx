@@ -56,6 +56,7 @@ import {
 } from '../api/alertRules';
 import { getPlants } from '../api/plants';
 import { getDetectors } from '../api/detectors';
+import { useAuth } from '../context/AuthContext';
 import {
   Anomaly,
   AnomalyEvidenceResponse,
@@ -88,6 +89,10 @@ const STATUS_CONFIG: Record<AnomalyStatus, { label: string; badge: string; text:
 export const AnomaliesPage: React.FC<{
   onAskCopilot?: (prompt: string, context?: any) => void;
 }> = ({ onAskCopilot }) => {
+  const { user } = useAuth();
+  const userRole = user?.role?.toLowerCase() || 'viewer';
+  const isReadOnlyViewer = userRole === 'viewer';
+
   const { activeDatasets, setActiveDatasets, allFilesSummary } = useActiveDatasets();
   const isWeatherOnly =
     activeDatasets.length === 1 && activeDatasets[0].toLowerCase().includes('weather');
@@ -675,36 +680,44 @@ export const AnomaliesPage: React.FC<{
                     <span>Ask Copilot</span>
                   </button>
                 )}
-                <button
-                  id="btn-detail-triage"
-                  onClick={() => {
-                    setTargetTriageStatus('acknowledged');
-                    setSingleTriageModal(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition"
-                >
-                  Acknowledge
-                </button>
-                <button
-                  id="btn-detail-resolve"
-                  onClick={() => {
-                    setTargetTriageStatus('resolved');
-                    setSingleTriageModal(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition"
-                >
-                  Resolve
-                </button>
-                <button
-                  id="btn-detail-fp"
-                  onClick={() => {
-                    setTargetTriageStatus('false_positive');
-                    setSingleTriageModal(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold shadow-xs transition"
-                >
-                  False Positive
-                </button>
+                {isReadOnlyViewer ? (
+                  <span className="px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-xs font-mono font-semibold">
+                    Viewer Mode (Read-Only)
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      id="btn-detail-triage"
+                      onClick={() => {
+                        setTargetTriageStatus('acknowledged');
+                        setSingleTriageModal(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition"
+                    >
+                      Acknowledge
+                    </button>
+                    <button
+                      id="btn-detail-resolve"
+                      onClick={() => {
+                        setTargetTriageStatus('resolved');
+                        setSingleTriageModal(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition"
+                    >
+                      Resolve
+                    </button>
+                    <button
+                      id="btn-detail-fp"
+                      onClick={() => {
+                        setTargetTriageStatus('false_positive');
+                        setSingleTriageModal(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold shadow-xs transition"
+                    >
+                      False Positive
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1113,36 +1126,44 @@ export const AnomaliesPage: React.FC<{
                 <span>{selectedIds.length} ANOMALIES SELECTED</span>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  id="btn-bulk-acknowledge"
-                  onClick={() => {
-                    setBulkTargetStatus('acknowledged');
-                    setBulkModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition"
-                >
-                  Acknowledge Selected
-                </button>
-                <button
-                  id="btn-bulk-resolve"
-                  onClick={() => {
-                    setBulkTargetStatus('resolved');
-                    setBulkModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
-                >
-                  Resolve Selected
-                </button>
-                <button
-                  id="btn-bulk-fp"
-                  onClick={() => {
-                    setBulkTargetStatus('false_positive');
-                    setBulkModalOpen(true);
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition"
-                >
-                  Mark False Positive
-                </button>
+                {!isReadOnlyViewer ? (
+                  <>
+                    <button
+                      id="btn-bulk-acknowledge"
+                      onClick={() => {
+                        setBulkTargetStatus('acknowledged');
+                        setBulkModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition"
+                    >
+                      Acknowledge Selected
+                    </button>
+                    <button
+                      id="btn-bulk-resolve"
+                      onClick={() => {
+                        setBulkTargetStatus('resolved');
+                        setBulkModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+                    >
+                      Resolve Selected
+                    </button>
+                    <button
+                      id="btn-bulk-fp"
+                      onClick={() => {
+                        setBulkTargetStatus('false_positive');
+                        setBulkModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-bold transition"
+                    >
+                      Mark False Positive
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Viewer Mode: Bulk triage actions restricted
+                  </span>
+                )}
                 <button
                   id="btn-bulk-cancel"
                   onClick={() => setSelectedIds([])}

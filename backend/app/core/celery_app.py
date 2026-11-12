@@ -24,6 +24,8 @@ celery_app = Celery(
     include=[
         "app.tasks.kpi_tasks",
         "app.tasks.detector_tasks",
+        "app.tasks.report_tasks",
+        "app.tasks.replay_tasks",
     ],
 )
 

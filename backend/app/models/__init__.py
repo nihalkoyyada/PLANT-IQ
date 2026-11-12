@@ -25,6 +25,10 @@ from app.models.entities import (
     Reading,
     ToolCallRecord,
     User,
+    PlatformSetting,
+    UserInvitation,
+    Report,
+    ReplaySession,
 )
 
 __all__ = [
@@ -53,4 +57,6 @@ __all__ = [
     "Message",
     "ToolCallRecord",
     "ChartRecord",
+    "Report",
+    "ReplaySession",
 ]

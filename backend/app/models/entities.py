@@ -81,6 +81,16 @@ class Organization(Base):
         String,
         nullable=False,
     )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default="active",
+        default="active",
+    )
+    details: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -95,6 +105,9 @@ class Organization(Base):
 
     users: Mapped[List["User"]] = relationship(
         "User", back_populates="organization", cascade="all, delete-orphan"
+    )
+    invitations: Mapped[List["UserInvitation"]] = relationship(
+        "UserInvitation", back_populates="organization", cascade="all, delete-orphan"
     )
     plants: Mapped[List["Plant"]] = relationship(
         "Plant", back_populates="organization", cascade="all, delete-orphan"
@@ -135,10 +148,10 @@ class User(Base):
         default=uuid4,
         server_default=func.gen_random_uuid(),
     )
-    org_id: Mapped[UUID] = mapped_column(
+    org_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
     email: Mapped[str] = mapped_column(
         Text,
@@ -168,7 +181,10 @@ class User(Base):
         server_default=func.now(),
     )
 
-    organization: Mapped["Organization"] = relationship("Organization", back_populates="users")
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="users")
+    sent_invitations: Mapped[List["UserInvitation"]] = relationship(
+        "UserInvitation", back_populates="invited_by", foreign_keys="UserInvitation.invited_by_user_id"
+    )
 
     def __init__(self, **kwargs: Any) -> None:
         if "organization_id" in kwargs:
@@ -181,11 +197,11 @@ class User(Base):
         super().__init__(**kwargs)
 
     @property
-    def organization_id(self) -> UUID:
+    def organization_id(self) -> Optional[UUID]:
         return self.org_id
 
     @organization_id.setter
-    def organization_id(self, value: UUID) -> None:
+    def organization_id(self, value: Optional[UUID]) -> None:
         self.org_id = value
 
     @property
@@ -210,6 +226,72 @@ class User(Base):
             name="ck_users_role",
         ),
     )
+
+
+class UserInvitation(Base):
+    """Pending or accepted user invitation for controlled onboarding."""
+
+    __tablename__ = "user_invitations"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    token: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    email: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True,
+    )
+    full_name: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+    role: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    invited_by_user_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default="pending",
+        default="pending",
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization", back_populates="invitations")
+    invited_by: Mapped[Optional["User"]] = relationship("User", back_populates="sent_invitations", foreign_keys=[invited_by_user_id])
+
 
 
 class Plant(Base):
@@ -653,7 +735,7 @@ class File(Base):
     )
     created_by: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -825,6 +907,12 @@ class Reading(Base):
     def __init__(self, **kwargs: Any) -> None:
         if "val" in kwargs and "value" not in kwargs:
             kwargs["value"] = kwargs.pop("val")
+        if "time" in kwargs and "ts" not in kwargs:
+            kwargs["ts"] = kwargs.pop("time")
+        if "timestamp" in kwargs and "ts" not in kwargs:
+            kwargs["ts"] = kwargs.pop("timestamp")
+        if "qc_flag" in kwargs and "quality" not in kwargs:
+            kwargs["quality"] = kwargs.pop("qc_flag")
         super().__init__(**kwargs)
 
     @property
@@ -1172,7 +1260,7 @@ class Anomaly(Base):
     )
     rca_by: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     status_note: Mapped[Optional[str]] = mapped_column(
@@ -1255,7 +1343,7 @@ class AuditLog(Base):
     )
     user_id: Mapped[Optional[UUID]] = mapped_column(
         Uuid(as_uuid=True),
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     action: Mapped[str] = mapped_column(
@@ -1621,4 +1709,210 @@ class ChartRecord(Base):
     )
 
     message: Mapped[Optional["Message"]] = relationship("Message", back_populates="charts")
+
+
+
+class PlatformSetting(Base):
+    """Platform-wide settings and configuration for Super Admin."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+    )
+    value: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=False,
+        server_default="{}",
+        default=dict,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class Report(Base):
+    """Generated operational or performance report entity (S6-FS-01)."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    report_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    start_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+    end_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="pending",
+        server_default="pending",
+    )
+    file_path: Mapped[Optional[str]] = mapped_column(
+        String(512),
+        nullable=True,
+    )
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    metrics_summary: Mapped[Optional[dict]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_by_user_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    plant: Mapped["Plant"] = relationship("Plant")
+    created_by_user: Mapped[Optional["User"]] = relationship("User")
+
+
+class ReplaySession(Base):
+    """Telemetry Replay Session entity tracking demo mode playback state."""
+
+    __tablename__ = "replay_sessions"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    dataset_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default="Surya-A-demo.csv",
+        server_default="Surya-A-demo.csv",
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="idle",
+        server_default="idle",
+        index=True,
+    )
+    speed: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    current_index: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    total_records: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3158,
+        server_default="3158",
+    )
+    current_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    celery_task_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    plant: Mapped["Plant"] = relationship("Plant")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('idle', 'running', 'paused', 'stopped', 'completed', 'failed')",
+            name="ck_replay_sessions_status",
+        ),
+        CheckConstraint(
+            "speed IN (1, 5, 10, 60)",
+            name="ck_replay_sessions_speed",
+        ),
+    )
 

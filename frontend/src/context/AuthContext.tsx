@@ -7,7 +7,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string, portal?: 'platform_admin' | 'scada') => Promise<User>;
   logout: () => void;
 }
 
@@ -20,6 +20,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     localStorage.removeItem('plantiq_token');
+    localStorage.removeItem('plantiq_active_tab');
+    sessionStorage.clear();
     setToken(null);
     setUser(null);
   };
@@ -55,10 +57,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<User> => {
+  const login = async (
+    email: string,
+    password: string,
+    portal?: 'platform_admin' | 'scada'
+  ): Promise<User> => {
+    // Purge any stale session state before new authentication
+    localStorage.removeItem('plantiq_token');
+    localStorage.removeItem('plantiq_active_tab');
+    sessionStorage.clear();
+    setToken(null);
+    setUser(null);
+
     setIsLoading(true);
     try {
-      const res = await loginApi(email, password);
+      const res = await loginApi(email, password, portal);
       localStorage.setItem('plantiq_token', res.access_token);
       setToken(res.access_token);
       setUser(res.user);

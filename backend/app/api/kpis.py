@@ -154,9 +154,10 @@ def get_pr_heatmap(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found")
         enforce_org_access(current_user, plant.org_id)
     else:
-        plant = db.execute(
-            select(Plant).where(Plant.org_id == current_user.org_id).order_by(Plant.created_at.desc())
-        ).scalars().first()
+        kpi_p_query = select(Plant).order_by(Plant.created_at.desc())
+        if current_user.role != "super_admin":
+            kpi_p_query = kpi_p_query.where(Plant.org_id == current_user.org_id)
+        plant = db.execute(kpi_p_query).scalars().first()
         if plant is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No plant found for user organization")
 
@@ -169,15 +170,17 @@ def get_pr_heatmap(
     ).scalars().all()
 
     if not inverters:
-        inverters = db.execute(
+        inv_q = (
             select(Asset)
             .join(Plant, Asset.plant_id == Plant.id)
             .where(
-                Plant.org_id == current_user.org_id,
+                Asset.plant_id == plant.id,
                 (Asset.asset_type == "inverter") | (Asset.name.ilike("%inverter%")),
             )
-            .order_by(Asset.name)
-        ).scalars().all()
+        )
+        if current_user.role != "super_admin":
+            inv_q = inv_q.where(Plant.org_id == current_user.org_id)
+        inverters = db.execute(inv_q.order_by(Asset.name)).scalars().all()
 
     # 3. Query max telemetry timestamp across plant inverter channels
     max_ts = db.execute(
@@ -435,9 +438,10 @@ def get_top_losers(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plant not found")
         enforce_org_access(current_user, plant.org_id)
     else:
-        plant = db.execute(
-            select(Plant).where(Plant.org_id == current_user.org_id).order_by(Plant.created_at.desc())
-        ).scalars().first()
+        kpi_p_query = select(Plant).order_by(Plant.created_at.desc())
+        if current_user.role != "super_admin":
+            kpi_p_query = kpi_p_query.where(Plant.org_id == current_user.org_id)
+        plant = db.execute(kpi_p_query).scalars().first()
         if plant is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No plant found for user organization")
 
@@ -450,15 +454,17 @@ def get_top_losers(
     ).scalars().all()
 
     if not inverters:
-        inverters = db.execute(
+        inv_q = (
             select(Asset)
             .join(Plant, Asset.plant_id == Plant.id)
             .where(
-                Plant.org_id == current_user.org_id,
+                Asset.plant_id == plant.id,
                 (Asset.asset_type == "inverter") | (Asset.name.ilike("%inverter%")),
             )
-            .order_by(Asset.name)
-        ).scalars().all()
+        )
+        if current_user.role != "super_admin":
+            inv_q = inv_q.where(Plant.org_id == current_user.org_id)
+        inverters = db.execute(inv_q.order_by(Asset.name)).scalars().all()
 
     if not inverters:
         return LossAnalysisResponse(

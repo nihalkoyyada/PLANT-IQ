@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Activity,
   Shield,
+  ShieldCheck,
   Lock,
   Mail,
   Eye,
@@ -20,12 +21,14 @@ import { LiveTelemetryWidget } from '../components/common/LiveTelemetryWidget';
 
 interface LoginPageProps {
   onNavigateRegister?: () => void;
+  onNavigateAdminLogin?: () => void;
   successMessage?: string | null;
   initialEmail?: string;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   onNavigateRegister,
+  onNavigateAdminLogin,
   initialEmail = '',
 }) => {
   const { login } = useAuth();
@@ -35,24 +38,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-
-
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
     setIsSubmitting(true);
 
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, 'scada');
     } catch (err: any) {
       console.error('Login failed:', err);
+      let message = 'Authentication failed. Please verify credentials and try again.';
+      const detail = err.response?.data?.detail;
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        message = detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        message = detail.message || JSON.stringify(detail);
+      }
+
       if (!err.response) {
-        setErrorMessage('Unable to connect to PlantIQ authentication service. Please try again.');
+        setErrorMessage('Unable to connect to PlantIQ authentication service. Please verify network access.');
       } else if (err.response.status === 401) {
-        setErrorMessage('Invalid email or password');
+        setErrorMessage('Invalid email or password. Please verify credentials.');
+      } else if (err.response.status === 403) {
+        setErrorMessage(message || 'Access restricted. Please contact platform administration.');
+      } else if (err.response.status === 422) {
+        setErrorMessage('Please enter both email and password.');
       } else {
-        const detail = err.response?.data?.detail || 'Authentication failed. Please try again.';
-        setErrorMessage(detail);
+        setErrorMessage(message);
       }
     } finally {
       setIsSubmitting(false);
@@ -85,10 +99,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
         </div>
 
-        {/* Top Right Floating Translucent Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/50 border border-white/20 backdrop-blur-md text-xs text-white font-mono shadow-md">
-          <Shield className="w-4 h-4 text-emerald-400" />
-          <span>Secure • Reliable • Scalable</span>
+        {/* Top Right Actions */}
+        <div className="flex items-center gap-3">
+          {onNavigateAdminLogin && (
+            <button
+              type="button"
+              onClick={onNavigateAdminLogin}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950/70 hover:bg-purple-900/90 border border-purple-400/40 backdrop-blur-md text-xs text-purple-200 hover:text-white font-mono shadow-md transition cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-300" />
+              <span>Platform Admin Login</span>
+            </button>
+          )}
+
+          <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/50 border border-white/20 backdrop-blur-md text-xs text-white font-mono shadow-md">
+            <Shield className="w-4 h-4 text-emerald-400" />
+            <span>Secure • Reliable • Scalable</span>
+          </div>
         </div>
       </header>
 
@@ -179,14 +206,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
           {/* Title Section */}
           <div className="mb-5">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Secure SCADA Access</h2>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">SCADA Operational Login</h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Authenticate your PlantIQ operator account
+              Authenticate your Organization Admin, Engineer, or Viewer account
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={(e) => e.preventDefault()} autoComplete="off" className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
             {errorMessage && (
               <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl text-xs flex items-center gap-2.5 font-medium">
                 <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
@@ -194,16 +221,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
             )}
 
-            {/* Plant / Organization Selector */}
+            {/* Platform / Organization Domain Context */}
             <div>
               <label className="block text-[10px] font-mono uppercase text-slate-500 font-semibold mb-1">
-                ORGANIZATION / PLANT SELECTOR
+                PLATFORM ACCESS DOMAIN
               </label>
               <div className="relative">
                 <Building2 className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <select className="w-full text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-8 py-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer appearance-none">
+                  <option>🌐 PlantIQ Enterprise Cloud (Universal Single Sign-On)</option>
                   <option>🟢 Surya Power Corp — Surya Solar Farm (50MW)</option>
-                  <option>🟢 Surya Power Corp — Surya Solar Farm Phase 2 (25MW)</option>
                 </select>
               </div>
             </div>
@@ -211,7 +238,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             {/* Operator Email */}
             <div>
               <label className="block text-[10px] font-mono uppercase text-slate-500 font-semibold mb-1">
-                OPERATOR EMAIL
+                OPERATOR / ORG ADMIN EMAIL
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -238,9 +265,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text"
+                  type={showPassword ? 'text' : 'password'}
                   name="op_login_password_field"
-                  style={{ WebkitTextSecurity: showPassword ? 'none' : 'disc' } as any}
                   required
                   autoComplete="off"
                   data-lpignore="true"
@@ -262,8 +288,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
             {/* Sign In Button */}
             <button
-              type="button"
-              onClick={() => handleSubmit()}
+              type="submit"
+              aria-label="Sign In to PlantIQ"
               disabled={isSubmitting}
               className="w-full py-3.5 bg-[#004874] hover:bg-[#003354] text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2 border border-sky-300/30 disabled:opacity-60 cursor-pointer mt-2"
             >
@@ -275,10 +301,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               ) : (
                 <>
                   <Lock className="w-4 h-4" />
-                  <span>Sign In to PlantIQ</span>
+                  <span>Sign In to SCADA</span>
                 </>
               )}
             </button>
+
+            {/* Switch to Platform Admin Login */}
+            {onNavigateAdminLogin && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={onNavigateAdminLogin}
+                  className="text-xs font-semibold text-purple-800 hover:text-purple-950 inline-flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Platform Super Admin? Access Admin Portal Login &rarr;</span>
+                </button>
+              </div>
+            )}
 
             {/* Link to Registration */}
             <div className="text-center pt-2 border-t border-slate-100 text-xs text-slate-500">
@@ -308,3 +348,5 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     </div>
   );
 };
+
+export default LoginPage;

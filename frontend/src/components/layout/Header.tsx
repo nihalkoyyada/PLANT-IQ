@@ -14,6 +14,7 @@ import {
   LogOut,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Sun,
   User as UserIcon,
   X,
@@ -574,6 +575,28 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
+        {/* Quick Portal Switcher for Admins */}
+        {user?.role === 'admin' && onNavigateTab && (
+          <button
+            type="button"
+            onClick={() => onNavigateTab('admin')}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-[#004874] border border-sky-200/80 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-[#004874]" />
+            <span>Admin Console</span>
+          </button>
+        )}
+        {user?.role === 'super_admin' && onNavigateTab && (
+          <button
+            type="button"
+            onClick={() => onNavigateTab('platform-admin' as any)}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200/80 rounded-lg text-xs font-semibold transition cursor-pointer shadow-xs"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+            <span>Platform Console</span>
+          </button>
+        )}
+
         {/* Authenticated User Profile */}
         <div ref={profileContainerRef} className="relative">
           <div
@@ -587,8 +610,10 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="text-xs font-bold text-slate-800 truncate max-w-[130px]">
                 {user?.full_name || 'Surya Admin'}
               </div>
-              <div className="text-[9px] font-mono font-bold text-sky-800 uppercase">
-                {user?.role || 'ADMIN'}
+              <div className={`text-[9px] font-mono font-bold uppercase ${
+                user?.role === 'super_admin' ? 'text-purple-700' : 'text-sky-800'
+              }`}>
+                {user?.role === 'super_admin' ? 'SUPER ADMIN' : user?.role || 'VIEWER'}
               </div>
             </div>
           </div>
@@ -604,6 +629,30 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
               </div>
+              {user?.role === 'super_admin' && (
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onNavigateTab?.('platform-admin' as any);
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs text-purple-800 hover:bg-purple-50 flex items-center gap-2 transition font-medium cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                  <span>Platform Super Admin</span>
+                </button>
+              )}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    onNavigateTab?.('admin');
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-2 transition font-medium cursor-pointer"
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 text-[#004874]" />
+                  <span>Organization Admin</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowProfileMenu(false);

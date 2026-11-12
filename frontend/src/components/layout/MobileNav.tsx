@@ -19,7 +19,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ activeTab, onSelectTab }) 
     { id: 'dashboard', label: 'Overview', icon: TrendingUp },
     { id: 'devices', label: 'Assets', icon: Boxes },
     { id: 'anomalies', label: 'Anomalies', icon: AlertTriangle },
-    { id: 'telemetry', label: 'Reports', icon: FileText },
+    { id: 'reports', label: 'Reports', icon: FileText },
   ] as const;
 
   return (

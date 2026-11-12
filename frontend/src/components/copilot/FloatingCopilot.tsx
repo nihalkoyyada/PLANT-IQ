@@ -101,7 +101,7 @@ export const FloatingCopilot: React.FC<FloatingCopilotProps> = ({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const plantId = selectedPlant?.id || 'd253760d-d8ad-4a18-b655-fc22a5222d59';
+  const plantId = selectedPlant?.id;
   const plantName = selectedPlant?.name || pageContext?.plantName || 'Surya Solar Farm';
 
   // Load copilot info and past conversations
@@ -136,6 +136,7 @@ export const FloatingCopilot: React.FC<FloatingCopilotProps> = ({
   }, [messages, isStreaming, isOpen, viewMode]);
 
   const loadConversations = async () => {
+    if (!plantId) return;
     try {
       const list = await listConversations(plantId);
       setConversations(list);
@@ -199,6 +200,10 @@ export const FloatingCopilot: React.FC<FloatingCopilotProps> = ({
   const handleSendMessage = async (promptToSend?: string) => {
     const text = (promptToSend || inputPrompt).trim();
     if (!text || isStreaming) return;
+    if (!plantId) {
+      setStreamError('Please select a plant to interact with the Solar Copilot.');
+      return;
+    }
 
     setInputPrompt('');
     setStreamError(null);

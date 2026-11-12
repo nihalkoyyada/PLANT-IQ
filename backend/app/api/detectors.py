@@ -28,11 +28,9 @@ def get_detectors(
     current_user: User = Depends(get_current_user),
 ):
     """List anomaly detectors for user organization."""
-    query = (
-        select(Detector)
-        .join(Plant, Detector.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-    )
+    query = select(Detector).join(Plant, Detector.plant_id == Plant.id)
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
     if plant_id is not None:
         query = query.where(Detector.plant_id == plant_id)
 
@@ -69,7 +67,7 @@ def get_detector(
 def create_detector(
     detector_in: DetectorCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "engineer")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Create a new anomaly detector configuration."""
     plant = db.get(Plant, detector_in.plant_id)
@@ -117,7 +115,7 @@ def update_detector(
     detector_id: UUID,
     detector_update: DetectorUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "engineer")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Update an existing anomaly detector configuration."""
     detector = db.get(Detector, detector_id)
@@ -155,7 +153,7 @@ def update_detector(
 def delete_detector(
     detector_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin", "engineer")),
+    current_user: User = Depends(require_role("admin")),
 ):
     """Delete an anomaly detector configuration."""
     detector = db.get(Detector, detector_id)

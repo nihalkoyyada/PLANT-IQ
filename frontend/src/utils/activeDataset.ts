@@ -160,7 +160,7 @@ export const useActiveDatasets = () => {
   }, []);
 
   useEffect(() => {
-    fetchActiveSources();
+    fetchActiveSources(true);
 
     const handleUpdated = (event: Event) => {
       const custom = event as CustomEvent<string[]>;

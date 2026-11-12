@@ -44,28 +44,33 @@ def get_qc_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Retrieve database Quality Check (QC) metrics for the user's organization."""
-    active_channels_count = db.scalar(
+    chan_query = (
         select(func.count(Channel.id))
         .join(Asset, Channel.asset_id == Asset.id)
         .join(Plant, Asset.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-    ) or 0
-
-    total_readings_count = db.scalar(
+    )
+    readings_query = (
         select(func.count(Reading.ts))
         .join(Channel, Reading.channel_id == Channel.id)
         .join(Asset, Channel.asset_id == Asset.id)
         .join(Plant, Asset.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-    ) or 0
-
-    out_of_bounds_count = db.scalar(
+    )
+    oob_query = (
         select(func.count(Reading.ts))
         .join(Channel, Reading.channel_id == Channel.id)
         .join(Asset, Channel.asset_id == Asset.id)
         .join(Plant, Asset.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id, Reading.value < 0)
-    ) or 0
+        .where(Reading.value < 0)
+    )
+
+    if current_user.role != "super_admin" and current_user.org_id is not None:
+        chan_query = chan_query.where(Plant.org_id == current_user.org_id)
+        readings_query = readings_query.where(Plant.org_id == current_user.org_id)
+        oob_query = oob_query.where(Plant.org_id == current_user.org_id)
+
+    active_channels_count = db.scalar(chan_query) or 0
+    total_readings_count = db.scalar(readings_query) or 0
+    out_of_bounds_count = db.scalar(oob_query) or 0
 
     return QCStatsResponse(
         total_readings=total_readings_count,

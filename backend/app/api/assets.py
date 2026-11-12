@@ -77,12 +77,10 @@ def get_assets(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = db.execute(
-        select(Asset)
-        .join(Plant, Asset.plant_id == Plant.id)
-        .where(Plant.org_id == current_user.org_id)
-        .order_by(Asset.name)
-    )
+    query = select(Asset).join(Plant, Asset.plant_id == Plant.id)
+    if current_user.role != "super_admin":
+        query = query.where(Plant.org_id == current_user.org_id)
+    result = db.execute(query.order_by(Asset.name))
 
     return result.scalars().all()
 
@@ -99,9 +97,10 @@ def get_assets_tree(
     """Retrieve recursive asset hierarchy tree."""
     from app.api.plants import get_plant_asset_tree
     if plant_id is None:
-        first_plant = db.execute(
-            select(Plant).where(Plant.org_id == current_user.org_id).order_by(Plant.created_at.desc())
-        ).scalars().first()
+        p_query = select(Plant).order_by(Plant.created_at.desc())
+        if current_user.role != "super_admin":
+            p_query = p_query.where(Plant.org_id == current_user.org_id)
+        first_plant = db.execute(p_query).scalars().first()
         if not first_plant:
             return []
         plant_id = first_plant.id

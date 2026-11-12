@@ -907,6 +907,12 @@ class Reading(Base):
     def __init__(self, **kwargs: Any) -> None:
         if "val" in kwargs and "value" not in kwargs:
             kwargs["value"] = kwargs.pop("val")
+        if "time" in kwargs and "ts" not in kwargs:
+            kwargs["ts"] = kwargs.pop("time")
+        if "timestamp" in kwargs and "ts" not in kwargs:
+            kwargs["ts"] = kwargs.pop("timestamp")
+        if "qc_flag" in kwargs and "quality" not in kwargs:
+            kwargs["quality"] = kwargs.pop("qc_flag")
         super().__init__(**kwargs)
 
     @property
@@ -1727,3 +1733,186 @@ class PlatformSetting(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class Report(Base):
+    """Generated operational or performance report entity (S6-FS-01)."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    report_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+    start_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+    end_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="pending",
+        server_default="pending",
+    )
+    file_path: Mapped[Optional[str]] = mapped_column(
+        String(512),
+        nullable=True,
+    )
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    metrics_summary: Mapped[Optional[dict]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"),
+        nullable=True,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    created_by_user_id: Mapped[Optional[UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    plant: Mapped["Plant"] = relationship("Plant")
+    created_by_user: Mapped[Optional["User"]] = relationship("User")
+
+
+class ReplaySession(Base):
+    """Telemetry Replay Session entity tracking demo mode playback state."""
+
+    __tablename__ = "replay_sessions"
+
+    id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    org_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    plant_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("plants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    dataset_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        default="Surya-A-demo.csv",
+        server_default="Surya-A-demo.csv",
+    )
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="idle",
+        server_default="idle",
+        index=True,
+    )
+    speed: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    current_index: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    total_records: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3158,
+        server_default="3158",
+    )
+    current_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+    )
+    celery_task_id: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    organization: Mapped["Organization"] = relationship("Organization")
+    plant: Mapped["Plant"] = relationship("Plant")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('idle', 'running', 'paused', 'stopped', 'completed', 'failed')",
+            name="ck_replay_sessions_status",
+        ),
+        CheckConstraint(
+            "speed IN (1, 5, 10, 60)",
+            name="ck_replay_sessions_speed",
+        ),
+    )
+

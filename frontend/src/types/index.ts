@@ -668,3 +668,68 @@ export interface PlatformSettingsResponse {
   version: string;
   updated_at?: string | null;
 }
+
+export interface ReportMetricsSummary {
+  gross_generation_mwh?: number | null;
+  revenue_generated_inr?: number | null;
+  performance_ratio?: number | null;
+  cuf_percent?: number | null;
+  availability_percent?: number | null;
+  anomalies_count?: number | null;
+  revenue_loss_inr?: number | null;
+  has_telemetry_gap?: boolean;
+}
+
+export interface Report {
+  id: string;
+  org_id: string;
+  plant_id: string;
+  plant_name?: string | null;
+  report_type: 'daily' | 'weekly' | string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | string;
+  file_size_bytes?: number | null;
+  metrics_summary?: ReportMetricsSummary | null;
+  error_message?: string | null;
+  created_by_user_id?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface ReportListResponse {
+  items: Report[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+
+export type ReplaySpeed = 1 | 5 | 10 | 60;
+
+export interface ReplaySession {
+  session_id: string;
+  org_id: string;
+  plant_id: string;
+  plant_name?: string | null;
+  dataset_name: string;
+  status: 'stopped' | 'running' | 'paused' | 'completed' | 'failed' | string;
+  speed: ReplaySpeed;
+  current_index: number;
+  total_records: number;
+  progress_percent: number;
+  current_timestamp?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  error_message?: string | null;
+  is_demo_plant: boolean;
+}
+
+export interface DemoResetResult {
+  status: string;
+  message: string;
+  plant_id: string;
+  readings_cleared: number;
+  anomalies_cleared: number;
+}

@@ -9,12 +9,13 @@ import {
   ShieldAlert,
   Sliders,
   Users,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getQCStats } from '../../api/readings';
 import { useActiveDatasets } from '../../utils/activeDataset';
 
-export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'anomalies' | 'copilot' | 'ingestion' | 'quality' | 'admin' | 'platform-admin' | 'detectors' | 'users';
+export type NavTab = 'dashboard' | 'plants' | 'devices' | 'telemetry' | 'anomalies' | 'copilot' | 'ingestion' | 'quality' | 'admin' | 'platform-admin' | 'detectors' | 'users' | 'reports';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -94,6 +95,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onSelectTab }) => {
     { id: 'telemetry', label: 'Telemetry Explorer', icon: LineChart },
     { id: 'anomalies', label: 'Anomaly Inbox', icon: ShieldAlert },
     { id: 'detectors', label: 'Detector Registry', icon: Sliders },
+    { id: 'reports', label: 'Reports', icon: FileText },
     ...(canAccessUpload ? [{ id: 'ingestion', label: 'Upload & Mapping', icon: UploadCloud }] : []),
     { id: 'quality', label: 'Data Quality & QC', icon: CheckCircle2 },
     ...(canAccessUserManagement ? [{ id: 'users', label: 'User Management', icon: Users }] : []),

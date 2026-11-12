@@ -16,6 +16,7 @@ import { AnomaliesPage } from './pages/AnomaliesPage';
 import { CopilotPage } from './pages/CopilotPage';
 import { AdminPage } from './pages/AdminPage';
 import { PlatformAdminPage } from './pages/PlatformAdminPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { AdminDetectorsTab } from './components/admin/AdminDetectorsTab';
 import { AdminUsersTab } from './components/admin/AdminUsersTab';
 import { FloatingCopilot } from './components/copilot/FloatingCopilot';
@@ -31,6 +32,7 @@ export const tabToPath: Record<NavTab, string> = {
   'telemetry': '/telemetry',
   'anomalies': '/anomalies',
   'detectors': '/detectors',
+  'reports': '/reports',
   'copilot': '/copilot',
   'ingestion': '/upload',
   'quality': '/quality',
@@ -46,6 +48,7 @@ export const pathToTab: Record<string, NavTab> = {
   '/telemetry': 'telemetry',
   '/anomalies': 'anomalies',
   '/detectors': 'detectors',
+  '/reports': 'reports',
   '/copilot': 'copilot',
   '/upload': 'ingestion',
   '/ingestion': 'ingestion',
@@ -368,6 +371,7 @@ function AppContent() {
           {activeTab === 'devices' && <DevicesPage onAskCopilot={handleAskCopilot} />}
           {activeTab === 'telemetry' && <TelemetryPage onAskCopilot={handleAskCopilot} />}
           {activeTab === 'anomalies' && <AnomaliesPage onAskCopilot={handleAskCopilot} />}
+          {activeTab === 'reports' && <ReportsPage onAskCopilot={handleAskCopilot} />}
           {activeTab === 'copilot' && (
             <CopilotPage
               selectedPlant={selectedPlant}

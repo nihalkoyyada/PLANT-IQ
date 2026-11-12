@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ data.metadata.plant_name }} - {{ data.metadata.period_label }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm;
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: monospace;
+        font-size: 8pt;
+        color: #64748b;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #0f172a;
+      line-height: 1.4;
+      margin: 0;
+      padding: 0;
+      font-size: 10pt;
+    }
+    .header {
+      border-bottom: 2px solid #0284c7;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      font-size: 18pt;
+      font-weight: 800;
+      color: #004874;
+      letter-spacing: -0.5px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-family: monospace;
+    }
+    .badge-primary { background: #e0f2fe; color: #0369a1; }
+    .badge-warning { background: #fef3c7; color: #b45309; }
+    .badge-danger { background: #ffe4e6; color: #e11d48; }
+    .badge-success { background: #dcfce7; color: #15803d; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .kpi-label {
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .kpi-value {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 4px;
+      font-family: monospace;
+    }
+    .alert-box {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+      font-size: 9pt;
+      color: #92400e;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 8.5pt;
+    }
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      text-align: left;
+      padding: 8px 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 7pt;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    tr:nth-child(even) td {
+      background: #f8fafc;
+    }
+    .mono { font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="float: right; text-align: right;">
+      <span class="badge badge-primary">{{ data.metadata.report_type }}</span>
+      <div style="font-size: 8pt; color: #64748b; margin-top: 4px;">
+        Generated: {{ data.metadata.generated_at }}
+      </div>
+    </div>
+    <div class="brand">PLANTIQ SCADA ANALYTICS</div>
+    <div style="font-size: 13pt; font-weight: 600; color: #334155; margin-top: 4px;">
+      {{ data.metadata.plant_name }} &mdash; {{ data.metadata.period_label }}
+    </div>
+    <div style="font-size: 8.5pt; color: #64748b; margin-top: 2px;">
+      Reporting Window: <strong>{{ data.metadata.start_date }}</strong> to <strong>{{ data.metadata.end_date }}</strong> | Capacity: {{ data.metadata.capacity_ac_mw }} MW AC / {{ data.metadata.capacity_dc_mwp }} MWp DC
+    </div>
+  </div>
+
+  {% if data.telemetry_quality.has_gap %}
+  <div class="alert-box">
+    <strong>Telemetry Warning:</strong> Incomplete sensor coverage detected across the reporting period.
+    Missing dates: {{ data.telemetry_quality.missing_dates | join(', ') }}. KPIs calculated over available timestamps.
+  </div>
+  {% endif %}
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Gross Generation</div>
+      <div class="kpi-value">{{ data.kpis.gross_generation_mwh or 0.0 }} <span style="font-size: 9pt;">MWh</span></div>
+      <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">Revenue: ₹{{ "{:,.2f}".format(data.kpis.revenue_generated_inr or 0.0) }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Performance Ratio (PR)</div>
+      <div class="kpi-value">{{ data.kpis.performance_ratio or "N/A" }}{% if data.kpis.performance_ratio %}%{% endif %}</div>
+      <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">Target: {{ data.metadata.expected_pr_percent }}%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Capacity Util. Factor</div>
+      <div class="kpi-value">{{ data.kpis.cuf_percent or "N/A" }}{% if data.kpis.cuf_percent %}%{% endif %}</div>
+      <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">DC Nameplate Basis</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Plant Availability</div>
+      <div class="kpi-value">{{ data.kpis.availability_percent or "N/A" }}{% if data.kpis.availability_percent %}%{% endif %}</div>
+      <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">Active Inverters</div>
+    </div>
+  </div>
+
+  <h3 style="font-size: 11pt; color: #0f172a; margin-bottom: 8px;">1. Daily Performance Summary</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Generation (MWh)</th>
+        <th>PR (%)</th>
+        <th>CUF (%)</th>
+        <th>Availability (%)</th>
+        <th>Data Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for day in data.daily_breakdown %}
+      <tr>
+        <td class="mono">{{ day.date }}</td>
+        <td class="mono">{{ day.generation_mwh }}</td>
+        <td class="mono">{{ day.performance_ratio or "&mdash;" }}</td>
+        <td class="mono">{{ day.cuf_percent or "&mdash;" }}</td>
+        <td class="mono">{{ day.availability_percent or "&mdash;" }}</td>
+        <td>{{ day.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 style="font-size: 11pt; color: #0f172a; margin-bottom: 8px;">2. Inverter Performance Ranking (Top Losers)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Asset Name</th>
+        <th>Model</th>
+        <th>Generation (kWh)</th>
+        <th>PR (%)</th>
+        <th>Deficit (kWh)</th>
+        <th>Anomalies</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for inv in data.inverters[:10] %}
+      <tr>
+        <td><strong>{{ inv.asset_name }}</strong></td>
+        <td>{{ inv.model }}</td>
+        <td class="mono">{{ "{:,.1f}".format(inv.generation_kwh) }}</td>
+        <td class="mono">{{ inv.performance_ratio or "&mdash;" }}</td>
+        <td class="mono" style="color: {% if inv.deficit_kwh > 0 %}#e11d48{% else %}#15803d{% endif %};">
+          {{ "{:,.1f}".format(inv.deficit_kwh) }}
+        </td>
+        <td class="mono">{{ inv.anomaly_count }}</td>
+        <td>
+          <span class="badge {% if inv.status == 'Optimal' %}badge-success{% elif inv.status == 'Underperforming' %}badge-warning{% else %}badge-danger{% endif %}">
+            {{ inv.status }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3 style="font-size: 11pt; color: #0f172a; margin-bottom: 8px;">3. Detected Anomalies & Incident Triage</h3>
+  <p style="font-size: 8.5pt; color: #64748b; margin-top: -4px;">
+    Total Detected: <strong>{{ data.anomalies.total_count }}</strong> |
+    Critical: <span style="color: #e11d48; font-weight: bold;">{{ data.anomalies.by_severity.critical }}</span> |
+    High: <span style="color: #ea580c; font-weight: bold;">{{ data.anomalies.by_severity.high }}</span> |
+    Estimated Revenue Loss: <strong style="color: #e11d48;">₹{{ "{:,.2f}".format(data.anomalies.total_loss_inr) }}</strong>
+  </p>
+  {% if data.anomalies.items %}
+  <table>
+    <thead>
+      <tr>
+        <th>Detected Time</th>
+        <th>Asset</th>
+        <th>Detector</th>
+        <th>Severity</th>
+        <th>Loss (kWh)</th>
+        <th>Revenue Loss (₹)</th>
+        <th>Triage Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for anom in data.anomalies.items %}
+      <tr>
+        <td class="mono">{{ anom.detected_at }}</td>
+        <td>{{ anom.asset_name }}</td>
+        <td>{{ anom.detector_name }}</td>
+        <td><span class="badge {% if anom.severity == 'CRITICAL' %}badge-danger{% else %}badge-warning{% endif %}">{{ anom.severity }}</span></td>
+        <td class="mono">{{ anom.loss_kwh }}</td>
+        <td class="mono">₹{{ "{:,.2f}".format(anom.financial_loss_inr) }}</td>
+        <td>{{ anom.status }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="font-size: 8.5pt; color: #15803d; font-style: italic;">No anomalies detected during this reporting window.</p>
+  {% endif %}
+</body>
+</html>
+

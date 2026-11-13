@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { formatApiError } from '../../api/client';
 import {
   createPlatformUser,
   deletePlatformUser,
@@ -50,6 +51,8 @@ export const PlatformUsersTab: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [selectedUser, setSelectedUser] = useState<PlatformUserListItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [createModalError, setCreateModalError] = useState<string | null>(null);
+  const [editModalError, setEditModalError] = useState<string | null>(null);
 
   // Form states - Create
   const [createEmail, setCreateEmail] = useState<string>('');
@@ -82,7 +85,7 @@ export const PlatformUsersTab: React.FC = () => {
       setUsers(res.items);
       setTotalCount(res.total);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load platform users');
+      setError(formatApiError(err, 'Failed to load platform users'));
     } finally {
       setIsLoading(false);
     }
@@ -115,8 +118,11 @@ export const PlatformUsersTab: React.FC = () => {
     setCreatePassword('');
     setCreateRole('admin');
     setCreateIsActive(true);
+    setCreateModalError(null);
     if (organizations.length > 0) {
       setCreateOrgId(organizations[0].id);
+    } else {
+      setCreateOrgId('');
     }
     setError(null);
     setIsCreateModalOpen(true);
@@ -124,26 +130,48 @@ export const PlatformUsersTab: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createEmail.trim() || !createFullName.trim() || !createPassword || (createRole !== 'super_admin' && !createOrgId)) {
-      setError('All required fields must be completed');
+    setCreateModalError(null);
+    setError(null);
+
+    const email = createEmail.trim();
+    const fullName = createFullName.trim();
+    const password = createPassword;
+    const effectiveOrgId = createRole === 'super_admin' ? undefined : (createOrgId || (organizations.length > 0 ? organizations[0].id : undefined));
+
+    if (!email) {
+      setCreateModalError('Email address is required.');
       return;
     }
+    if (!fullName || fullName.length < 2) {
+      setCreateModalError('Full name must be at least 2 characters.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setCreateModalError('Password must be at least 6 characters.');
+      return;
+    }
+    if (createRole !== 'super_admin' && !effectiveOrgId) {
+      setCreateModalError('Please select an organization for this user. Create an organization first if none exist.');
+      return;
+    }
+
     setIsSubmitting(true);
-    setError(null);
     try {
       await createPlatformUser({
-        email: createEmail.trim(),
-        full_name: createFullName.trim(),
-        password: createPassword,
+        email,
+        full_name: fullName,
+        password,
         role: createRole,
-        org_id: createRole === 'super_admin' ? undefined : createOrgId,
+        org_id: effectiveOrgId,
         is_active: createIsActive,
       });
-      setSuccessMsg(`User "${createEmail}" created successfully.`);
+      setSuccessMsg(`User "${email}" created successfully.`);
       setIsCreateModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to create user');
+      const msg = formatApiError(err, 'Failed to create user');
+      setCreateModalError(msg);
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -155,7 +183,8 @@ export const PlatformUsersTab: React.FC = () => {
     setEditRole(user.role);
     setEditIsActive(user.is_active);
     setEditPassword('');
-    setEditOrgId(user.org_id);
+    setEditOrgId(user.org_id || (organizations.length > 0 ? organizations[0].id : ''));
+    setEditModalError(null);
     setError(null);
     setIsEditModalOpen(true);
   };
@@ -163,8 +192,15 @@ export const PlatformUsersTab: React.FC = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-    setIsSubmitting(true);
+    setEditModalError(null);
     setError(null);
+
+    if (editPassword && editPassword.length < 6) {
+      setEditModalError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
       await updatePlatformUser(selectedUser.id, {
         full_name: editFullName.trim() || undefined,
@@ -177,7 +213,9 @@ export const PlatformUsersTab: React.FC = () => {
       setIsEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update user');
+      const msg = formatApiError(err, 'Failed to update user');
+      setEditModalError(msg);
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -199,7 +237,7 @@ export const PlatformUsersTab: React.FC = () => {
       setIsDeleteModalOpen(false);
       fetchUsers();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to delete user');
+      setError(formatApiError(err, 'Failed to delete user'));
     } finally {
       setIsSubmitting(false);
     }
@@ -506,6 +544,13 @@ export const PlatformUsersTab: React.FC = () => {
               <strong>Delegated Team Administration:</strong> Organization Admins manage their own company's Field Engineers and Viewers from their dedicated Organization Admin Console.
             </div>
 
+            {createModalError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[11px] flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{createModalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleCreateSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Organization Scope *</label>
@@ -514,10 +559,14 @@ export const PlatformUsersTab: React.FC = () => {
                     <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                     <span><strong>Universal Platform Scope</strong>: Super Admins oversee all organizations across the platform.</span>
                   </div>
+                ) : organizations.length === 0 ? (
+                  <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    No organizations available. Please create an organization first.
+                  </div>
                 ) : (
                   <select
                     required
-                    value={createOrgId}
+                    value={createOrgId || (organizations[0]?.id || '')}
                     onChange={(e) => setCreateOrgId(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 bg-white"
                   >
@@ -628,6 +677,13 @@ export const PlatformUsersTab: React.FC = () => {
               </button>
             </div>
 
+            {editModalError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[11px] flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{editModalError}</span>
+              </div>
+            )}
+
             <form onSubmit={handleEditSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Full Name</label>
@@ -646,9 +702,13 @@ export const PlatformUsersTab: React.FC = () => {
                     <Shield className="w-3.5 h-3.5 text-purple-600 shrink-0" />
                     <span><strong>Universal Platform Scope</strong>: Super Admins oversee all organizations across the platform.</span>
                   </div>
+                ) : organizations.length === 0 ? (
+                  <div className="px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs">
+                    No organizations available.
+                  </div>
                 ) : (
                   <select
-                    value={editOrgId}
+                    value={editOrgId || (organizations[0]?.id || '')}
                     onChange={(e) => setEditOrgId(e.target.value)}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 bg-white"
                   >

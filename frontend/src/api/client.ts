@@ -35,3 +35,27 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Universal error formatter that prevents rendering raw objects/arrays in React JSX.
+ * Extracts clean, human-readable error messages from FastAPI 422 detail arrays,
+ * HTTPException detail strings, or network errors.
+ */
+export const formatApiError = (err: any, fallback: string = 'Operation failed'): string => {
+  const detail = err?.response?.data?.detail;
+  if (!detail) return err?.message || fallback;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d: any) => {
+        if (typeof d === 'string') return d;
+        const field = Array.isArray(d?.loc) && d.loc.length > 1 ? `${d.loc.slice(1).join('.')}: ` : '';
+        return `${field}${d?.msg || JSON.stringify(d)}`;
+      })
+      .join('; ');
+  }
+  if (typeof detail === 'object') {
+    return detail.msg || detail.message || JSON.stringify(detail);
+  }
+  return String(detail);
+};

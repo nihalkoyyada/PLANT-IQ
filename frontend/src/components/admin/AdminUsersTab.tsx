@@ -34,6 +34,7 @@ import {
   revokeInvitationApi,
   UserInvitation,
 } from '../../api/admin';
+import { formatApiError } from '../../api/client';
 import { Organization, User } from '../../types';
 
 export const AdminUsersTab: React.FC = () => {
@@ -108,7 +109,7 @@ export const AdminUsersTab: React.FC = () => {
       setUsers(res.items);
       setTotalCount(res.total);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load users');
+      setError(formatApiError(err, 'Failed to load users'));
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +181,7 @@ export const AdminUsersTab: React.FC = () => {
       setSuccessMsg(`Invitation created for ${inv.email}`);
       fetchInvitations();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to send user invitation');
+      setError(formatApiError(err, 'Failed to send user invitation'));
     } finally {
       setIsSubmitting(false);
     }
@@ -193,7 +194,7 @@ export const AdminUsersTab: React.FC = () => {
       fetchInvitations();
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to revoke invitation');
+      setError(formatApiError(err, 'Failed to revoke invitation'));
     }
   };
 
@@ -244,7 +245,7 @@ export const AdminUsersTab: React.FC = () => {
       fetchUsers();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to create user');
+      setError(formatApiError(err, 'Failed to create user'));
     } finally {
       setIsSubmitting(false);
     }
@@ -278,7 +279,7 @@ export const AdminUsersTab: React.FC = () => {
       fetchUsers();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update user');
+      setError(formatApiError(err, 'Failed to update user'));
     } finally {
       setIsSubmitting(false);
     }
@@ -301,7 +302,7 @@ export const AdminUsersTab: React.FC = () => {
       fetchUsers();
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to delete user');
+      setError(formatApiError(err, 'Failed to delete user'));
     } finally {
       setIsSubmitting(false);
     }

@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { getPlatformPlantsAssets } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformPlantsResponse } from '../../types';
 
 export const PlatformPlantsTab: React.FC = () => {
@@ -27,7 +28,7 @@ export const PlatformPlantsTab: React.FC = () => {
       const res = await getPlatformPlantsAssets();
       setData(res);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load cross-tenant plant inventory');
+      setError(formatApiError(err, 'Failed to load cross-tenant plant inventory'));
     } finally {
       setIsLoading(false);
     }

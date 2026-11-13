@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { getPlatformOverview } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformOverviewResponse } from '../../types';
 import { NavTab } from '../layout/Sidebar';
 import { PlatformSubTab } from '../../pages/PlatformAdminPage';
@@ -44,7 +45,7 @@ export const PlatformOverviewTab: React.FC<PlatformOverviewTabProps> = ({
       const data = await getPlatformOverview();
       setOverview(data);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load platform overview metrics');
+      setError(formatApiError(err, 'Failed to load platform overview metrics'));
     } finally {
       setIsLoading(false);
     }

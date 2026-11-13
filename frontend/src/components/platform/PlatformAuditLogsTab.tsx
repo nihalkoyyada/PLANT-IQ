@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { getPlatformAuditLogs, getPlatformOrganizations } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformAuditLogItem, PlatformOrgListItem } from '../../types';
 
 export const PlatformAuditLogsTab: React.FC = () => {
@@ -48,7 +49,7 @@ export const PlatformAuditLogsTab: React.FC = () => {
       setLogs(res.items);
       setTotalCount(res.total);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load global platform audit logs');
+      setError(formatApiError(err, 'Failed to load global platform audit logs'));
     } finally {
       setIsLoading(false);
     }

@@ -54,10 +54,13 @@ class CopilotChatRequest(BaseModel):
 
 
 def _verify_plant_access(plant_id: UUID, current_user: User, db: Session) -> Plant:
-    """Ensure user organization owns the specified plant."""
-    plant = db.execute(
-        select(Plant).where(Plant.id == plant_id, Plant.org_id == current_user.org_id)
-    ).scalar_one_or_none()
+    """Ensure user organization owns the specified plant or user is super_admin."""
+    if getattr(current_user, "role", None) == "super_admin":
+        plant = db.get(Plant, plant_id)
+    else:
+        plant = db.execute(
+            select(Plant).where(Plant.id == plant_id, Plant.org_id == current_user.org_id)
+        ).scalar_one_or_none()
     if not plant:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -76,10 +79,10 @@ async def chat_copilot(
 
     Executes tools, records full traces, extracts citation markers, and persists audit state.
     """
-    _verify_plant_access(request.plant_id, current_user, db)
+    plant = _verify_plant_access(request.plant_id, current_user, db)
 
     context = ToolSecurityContext(
-        org_id=current_user.org_id,
+        org_id=current_user.org_id or plant.org_id,
         plant_id=request.plant_id,
         user_id=current_user.id,
         user_role=current_user.role,
@@ -103,10 +106,10 @@ async def stream_copilot(
     db: Session = Depends(get_db),
 ) -> StreamingResponse:
     """Stream Copilot agent execution events and tokens incrementally over SSE."""
-    _verify_plant_access(request.plant_id, current_user, db)
+    plant = _verify_plant_access(request.plant_id, current_user, db)
 
     context = ToolSecurityContext(
-        org_id=current_user.org_id,
+        org_id=current_user.org_id or plant.org_id,
         plant_id=request.plant_id,
         user_id=current_user.id,
         user_role=current_user.role,
@@ -284,8 +287,9 @@ def execute_copilot_tool(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Execute a Copilot operational tool within the user's multi-tenant security context."""
+    plant = _verify_plant_access(request.plant_id, current_user, db)
     context = ToolSecurityContext(
-        org_id=current_user.org_id,
+        org_id=current_user.org_id or plant.org_id,
         plant_id=request.plant_id,
         user_id=current_user.id,
         user_role=current_user.role,

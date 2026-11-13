@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PlatformOrgAdminSummary(BaseModel):
@@ -77,6 +77,13 @@ class PlatformUserCreate(BaseModel):
     org_id: Optional[UUID] = None
     is_active: bool = True
 
+    @field_validator("org_id", mode="before")
+    @classmethod
+    def parse_empty_org_id(cls, v: Any) -> Any:
+        if v == "" or v is None:
+            return None
+        return v
+
 
 class PlatformUserUpdate(BaseModel):
     full_name: Optional[str] = None
@@ -84,6 +91,13 @@ class PlatformUserUpdate(BaseModel):
     is_active: Optional[bool] = None
     password: Optional[str] = Field(None, min_length=6)
     org_id: Optional[UUID] = None
+
+    @field_validator("org_id", mode="before")
+    @classmethod
+    def parse_empty_org_id(cls, v: Any) -> Any:
+        if v == "" or v is None:
+            return None
+        return v
 
 
 class SystemServiceHealth(BaseModel):

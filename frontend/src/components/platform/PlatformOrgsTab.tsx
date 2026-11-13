@@ -31,6 +31,7 @@ import {
   inspectPlatformTenant,
   updatePlatformOrganizationStatus,
 } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformOrgListItem, PlatformOverviewResponse, PlatformUserListItem } from '../../types';
 
 export const PlatformOrgsTab: React.FC = () => {
@@ -39,6 +40,7 @@ export const PlatformOrgsTab: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [createModalError, setCreateModalError] = useState<string | null>(null);
 
   // Filters & Pagination
   const [search, setSearch] = useState<string>('');
@@ -95,7 +97,7 @@ export const PlatformOrgsTab: React.FC = () => {
         // Fallback silently if overview has network delay
       }
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load platform organizations');
+      setError(formatApiError(err, 'Failed to load platform organizations'));
     } finally {
       setIsLoading(false);
     }
@@ -143,26 +145,36 @@ export const PlatformOrgsTab: React.FC = () => {
     setCreateAdminEmail('');
     setCreateAdminPassword('');
     setCreateAdminFullName('');
+    setCreateModalError(null);
     setError(null);
     setIsCreateModalOpen(true);
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createName.trim()) {
-      setError('Organization name is required');
+    setCreateModalError(null);
+    setError(null);
+
+    const name = createName.trim();
+    if (!name || name.length < 2) {
+      setCreateModalError('Organization name must be at least 2 characters.');
       return;
     }
-    if (createAdminEmail && !createAdminPassword) {
-      setError('Password is required when providing an initial Organization Admin email');
-      return;
+    if (createAdminEmail.trim()) {
+      if (!createAdminPassword || createAdminPassword.length < 6) {
+        setCreateModalError('Admin password must be at least 6 characters.');
+        return;
+      }
+      if (createAdminFullName.trim() && createAdminFullName.trim().length < 2) {
+        setCreateModalError('Admin full name must be at least 2 characters.');
+        return;
+      }
     }
 
     setIsSubmitting(true);
-    setError(null);
     try {
       await createPlatformOrganization({
-        name: createName.trim(),
+        name,
         details: createDetails.trim() || undefined,
         admin_email: createAdminEmail.trim() || undefined,
         admin_password: createAdminPassword || undefined,
@@ -172,7 +184,9 @@ export const PlatformOrgsTab: React.FC = () => {
       setIsCreateModalOpen(false);
       fetchOrgs();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to create organization');
+      const msg = formatApiError(err, 'Failed to create organization');
+      setCreateModalError(msg);
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -203,7 +217,7 @@ export const PlatformOrgsTab: React.FC = () => {
       setIsSuspendModalOpen(false);
       fetchOrgs();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update organization status');
+      setError(formatApiError(err, 'Failed to update organization status'));
     } finally {
       setIsSubmitting(false);
     }
@@ -217,7 +231,7 @@ export const PlatformOrgsTab: React.FC = () => {
       const details = await getPlatformOrganizationDetails(org.id);
       setOrgDetails(details);
     } catch (err: any) {
-      setError('Could not retrieve organization details');
+      setError(formatApiError(err, 'Could not retrieve organization details'));
     } finally {
       setIsLoadingModal(false);
     }
@@ -231,7 +245,7 @@ export const PlatformOrgsTab: React.FC = () => {
       const inspection = await inspectPlatformTenant(org.id);
       setInspectData(inspection);
     } catch (err: any) {
-      setError('Could not perform tenant inspection');
+      setError(formatApiError(err, 'Could not perform tenant inspection'));
     } finally {
       setIsLoadingModal(false);
     }
@@ -254,7 +268,7 @@ export const PlatformOrgsTab: React.FC = () => {
       setOrgToDelete(null);
       fetchOrgs();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to delete organization');
+      setError(formatApiError(err, 'Failed to delete organization'));
     } finally {
       setIsSubmitting(false);
     }
@@ -705,6 +719,13 @@ export const PlatformOrgsTab: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {createModalError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[11px] flex items-center gap-2 mb-3">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{createModalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div>

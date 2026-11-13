@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { getPlatformSettings, updatePlatformSettings } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformSettingsResponse } from '../../types';
 
 export const PlatformSettingsTab: React.FC = () => {
@@ -41,7 +42,7 @@ export const PlatformSettingsTab: React.FC = () => {
       setRetentionDays(data.telemetry_retention_days);
       setSessionTimeout(data.session_timeout_minutes);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load platform configuration');
+      setError(formatApiError(err, 'Failed to load platform configuration'));
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +66,7 @@ export const PlatformSettingsTab: React.FC = () => {
       setSettings(updated);
       setSuccessMsg('Platform configuration updated and applied globally.');
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to update platform settings');
+      setError(formatApiError(err, 'Failed to update platform settings'));
     } finally {
       setIsSaving(false);
     }

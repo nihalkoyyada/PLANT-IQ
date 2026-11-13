@@ -16,6 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { getPlatformMonitoring } from '../../api/platform';
+import { formatApiError } from '../../api/client';
 import { PlatformMonitoringResponse } from '../../types';
 
 export const PlatformMonitoringTab: React.FC = () => {
@@ -30,7 +31,7 @@ export const PlatformMonitoringTab: React.FC = () => {
       const res = await getPlatformMonitoring();
       setData(res);
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to retrieve system diagnostics');
+      setError(formatApiError(err, 'Failed to retrieve system diagnostics'));
     } finally {
       setIsLoading(false);
     }

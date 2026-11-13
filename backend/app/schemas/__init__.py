@@ -24,14 +24,6 @@ from app.schemas.report import (
     ReportListResponse,
     ReportResponse,
 )
-from app.schemas.demo import (
-    DemoResetRequest,
-    DemoResetResponse,
-    ReplayActionRequest,
-    ReplaySessionResponse,
-    ReplaySpeedRequest,
-    ReplayStartRequest,
-)
 
 __all__ = [
     "AnomalyBase",
@@ -50,10 +42,4 @@ __all__ = [
     "ReportGenerateRequest",
     "ReportResponse",
     "ReportListResponse",
-    "ReplayStartRequest",
-    "ReplaySpeedRequest",
-    "ReplayActionRequest",
-    "ReplaySessionResponse",
-    "DemoResetRequest",
-    "DemoResetResponse",
 ]

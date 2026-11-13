@@ -23,7 +23,6 @@ from app.api.dev import router as dev_router
 from app.api.admin import router as admin_router
 from app.api.platform import router as platform_router
 from app.api.reports import router as reports_router
-from app.api.demo import router as demo_router
 from app.core.config import settings
 from app.db.session import create_db_engine, get_session_factory
 from app.models import Asset
@@ -87,7 +86,6 @@ app.include_router(dev_router)
 app.include_router(admin_router)
 app.include_router(platform_router)
 app.include_router(reports_router)
-app.include_router(demo_router)
 
 
 @app.get("/health")
